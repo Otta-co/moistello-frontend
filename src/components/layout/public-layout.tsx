@@ -1,0 +1,257 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Menu,
+  X,
+  Sun,
+  Moon,
+  LayoutDashboard,
+  CircleDot,
+  Compass,
+  FileText,
+  ShieldQuestion,
+  Info,
+  Scale,
+  Lock,
+  Home,
+} from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Routes } from "@/lib/constants";
+import { useUIStore } from "@/stores/ui-store";
+
+interface PublicLayoutProps {
+  children: React.ReactNode;
+}
+
+export function PublicLayout({ children }: PublicLayoutProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useUIStore();
+  const isDark = theme === "dark";
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const toggleMenu = useCallback(() => setMenuOpen((prev) => !prev), []);
+
+  const navItems = [
+    { label: "Home", href: "/", icon: <Home className="h-4 w-4" /> },
+    { label: "How It Works", href: "/how-it-works", icon: <ShieldQuestion className="h-4 w-4" /> },
+    { label: "FAQ", href: "/faq", icon: <Info className="h-4 w-4" /> },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[rgb(var(--background))]">
+      {/* ════════════════ FLOATING HEADER ════════════════ */}
+      <motion.header
+        initial={{ y: -16, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed top-0 left-0 right-0 z-50 px-3 pt-3"
+      >
+        <div
+          className={cn(
+            "flex items-center justify-between h-14 px-4 rounded-2xl",
+            "glass-strong backdrop-blur-2xl",
+            "border border-white/[0.06] dark:border-white/[0.08]",
+            "depth-3",
+            "max-w-6xl mx-auto",
+          )}
+        >
+          {/* Left: Logo */}
+          <Link href="/" className="flex items-center gap-2 select-none shrink-0">
+            <span className="gradient-text-extended font-heading font-bold text-lg tracking-tight">
+              Moistello
+            </span>
+          </Link>
+
+          {/* Center: Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:glass-whisper rounded-lg transition-all duration-300"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Right: Theme Toggle + Hamburger */}
+          <div className="flex items-center gap-1.5">
+            {/* THEME TOGGLE — always visible */}
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 15 }}
+              whileTap={{ scale: 0.9, rotate: -15 }}
+              onClick={toggleTheme}
+              className={cn(
+                "inline-flex h-9 w-9 items-center justify-center rounded-full shrink-0",
+                "glass-whisper text-muted-foreground",
+                "transition-all duration-300 hover:text-foreground",
+                "hover:shadow-[0_0_18px_rgb(var(--aurora-violet)/0.2)]",
+              )}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <Sun className="h-4 w-4 text-amber-400" />
+              ) : (
+                <Moon className="h-4 w-4 text-indigo-400" />
+              )}
+            </motion.button>
+
+            {/* HAMBURGER — opens right slide mobile menu */}
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={toggleMenu}
+              className={cn(
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 md:hidden",
+                "text-muted-foreground transition-all duration-300",
+                "hover:text-foreground hover:glass-whisper",
+              )}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+            >
+              {menuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </motion.button>
+          </div>
+        </div>
+      </motion.header>
+
+      {/* ════════════════ MOBILE MENU — slides from RIGHT ════════════════ */}
+      <AnimatePresence>
+        {menuOpen && (
+          <>
+            {/* BLUR BACKDROP — clicking outside closes */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-lg"
+              onClick={closeMenu}
+            />
+
+            {/* SLIDE-OUT PANEL from RIGHT */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed top-0 right-0 bottom-0 z-50 w-[85vw] max-w-[340px]"
+            >
+              <div
+                className={cn(
+                  "flex flex-col h-full rounded-l-3xl overflow-hidden",
+                  "glass-flagship backdrop-blur-3xl",
+                  "border-l border-white/[0.08]",
+                  "shadow-[_-12px_0_60px_rgba(0,0,0,0.3)]",
+                )}
+              >
+                {/* Top accent line */}
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-aurora-violet/40 to-transparent" />
+
+                {/* Header: Logo + Close */}
+                <div className="flex h-16 items-center justify-between px-5 shrink-0">
+                  <span className="gradient-text-extended font-heading font-bold text-xl">
+                    Moistello
+                  </span>
+                  <button
+                    onClick={closeMenu}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:glass-whisper transition-all duration-300"
+                    aria-label="Close menu"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Nav links */}
+                <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
+                  <p className="px-3 pt-2 pb-2 font-heading text-[10px] tracking-[0.25em] uppercase text-muted-foreground/60">
+                    Navigate
+                  </p>
+                  {[
+                    { label: "Home", href: "/", icon: <Home className="h-[18px] w-[18px]" /> },
+                    { label: "How It Works", href: "/how-it-works", icon: <ShieldQuestion className="h-[18px] w-[18px]" /> },
+                    { label: "FAQ", href: "/faq", icon: <Info className="h-[18px] w-[18px]" /> },
+                    { label: "About", href: "/about", icon: <Info className="h-[18px] w-[18px]" /> },
+                  ].map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMenu}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:glass-whisper transition-all duration-300"
+                    >
+                      <span className="shrink-0">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </Link>
+                  ))}
+
+                  <p className="px-3 pt-6 pb-2 font-heading text-[10px] tracking-[0.25em] uppercase text-muted-foreground/60">
+                    Legal
+                  </p>
+                  {[
+                    { label: "Terms", href: "/terms", icon: <Scale className="h-[18px] w-[18px]" /> },
+                    { label: "Privacy", href: "/privacy", icon: <Lock className="h-[18px] w-[18px]" /> },
+                  ].map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMenu}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:glass-whisper transition-all duration-300"
+                    >
+                      <span className="shrink-0">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </Link>
+                  ))}
+                </nav>
+
+                {/* Bottom: Theme toggle */}
+                <div className="shrink-0 border-t border-white/[0.06] px-4 py-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={toggleTheme}
+                    className={cn(
+                      "flex items-center gap-3 w-full rounded-xl px-4 py-2.5",
+                      "text-sm font-body transition-all duration-300",
+                      "glass-whisper hover:glass-strong",
+                      "hover:shadow-[0_0_20px_rgb(var(--aurora-violet)/0.15)]",
+                    )}
+                  >
+                    <span className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-full glass-strong",
+                    )}>
+                      {isDark ? (
+                        <Sun className="h-4 w-4 text-amber-400" />
+                      ) : (
+                        <Moon className="h-4 w-4 text-indigo-400" />
+                      )}
+                    </span>
+                    <span className="flex-1 text-left text-foreground">
+                      {isDark ? "Light Mode" : "Dark Mode"}
+                    </span>
+                  </motion.button>
+                </div>
+
+                {/* Copyright */}
+                <div className="shrink-0 border-t border-white/[0.04] px-5 py-3">
+                  <p className="text-[10px] text-muted-foreground/40">
+                    &copy; {new Date().getFullYear()} Moistello
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ════════════════ PAGE CONTENT ════════════════ */}
+      <div className="pt-20">{children}</div>
+    </div>
+  );
+}
