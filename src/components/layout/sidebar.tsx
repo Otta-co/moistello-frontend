@@ -13,6 +13,7 @@ import {
   Bell,
   Settings,
   Wallet,
+  Vote,
   Sun,
   Moon,
 } from "lucide-react";
@@ -75,6 +76,12 @@ export function Sidebar() {
         { label: "Contributions", href: "/contributions", icon: <ArrowUpCircle className="h-[18px] w-[18px]" /> },
         { label: "Payouts", href: "/payouts", icon: <ArrowDownCircle className="h-[18px] w-[18px]" /> },
         { label: "Reputation", href: Routes.PROFILE_SCORE, icon: <Award className="h-[18px] w-[18px]" /> },
+      ],
+    },
+    {
+      title: "Governance",
+      items: [
+        { label: "Governance", href: "/governance", icon: <Vote className="h-[18px] w-[18px]" /> },
       ],
     },
     {

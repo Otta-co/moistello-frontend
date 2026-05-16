@@ -8,10 +8,6 @@ import {
   X,
   Sun,
   Moon,
-  LayoutDashboard,
-  CircleDot,
-  Compass,
-  FileText,
   ShieldQuestion,
   Info,
   Scale,
@@ -19,7 +15,6 @@ import {
   Home,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { Routes } from "@/lib/constants";
 import { useUIStore } from "@/stores/ui-store";
 
 interface PublicLayoutProps {

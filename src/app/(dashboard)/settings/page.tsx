@@ -13,7 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { useWallet } from "@/hooks/use-wallet"
+import { useMultiWallet } from "@/hooks/use-multi-wallet"
 import { PageHeader } from "@/components/shared/page-header"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { Button } from "@/components/ui/button"
@@ -95,7 +95,7 @@ const sectionV = {
 
 export default function SettingsPage() {
   const { user } = useAuth()
-  const { isConnected, address, disconnect: disconnectWallet } = useWallet()
+  const { isConnected, address, disconnect: disconnectWallet, activeWalletId, adapter, setSelectorOpen } = useMultiWallet()
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? "")
   const [email, setEmail] = useState(user?.email ?? "")
@@ -334,7 +334,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   <p className="text-sm font-medium text-foreground dark:text-white font-heading">
-                    Freighter Wallet
+                    {adapter?.meta.name ?? "Wallet"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
@@ -347,7 +347,7 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={disconnectWallet}
+                onClick={() => activeWalletId && disconnectWallet(activeWalletId)}
                 className="glass-whisper"
               >
                 Disconnect
@@ -356,7 +356,7 @@ export default function SettingsPage() {
           ) : (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground font-body">No wallet connected.</p>
-              <Button variant="primary" size="sm">
+              <Button variant="primary" size="sm" onClick={() => setSelectorOpen(true)}>
                 Connect Wallet
               </Button>
             </div>

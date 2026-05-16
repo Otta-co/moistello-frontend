@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   const sessions = JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = sessions.find((s: any) => s.token === cookie.value);
 
   if (!session) {
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
   let user = null;
   if (fs.existsSync(USERS_FILE)) {
     const users = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const u = users.find((u: any) => u.id === session.userId);
     if (u) user = { id: u.id, username: u.username, role: u.role };
   }

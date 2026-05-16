@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency, formatDate, formatAddress } from "@/lib/formatters"
-import { cn } from "@/lib/cn"
 import type {
   ApiResponse,
   Contribution as ContributionType,

@@ -14,7 +14,6 @@ import {
   Shield,
   Inbox,
   CheckCircle,
-  PlusCircle,
   UserPlus,
   Settings,
   Wallet,
@@ -452,7 +451,7 @@ export default function CircleDetailPage() {
             </span>
           </div>
           <p className="text-2xs text-muted-foreground">
-            This will open Freighter wallet for transaction signing.
+            This will open your connected wallet for transaction signing.
           </p>
         </div>
       </Modal>

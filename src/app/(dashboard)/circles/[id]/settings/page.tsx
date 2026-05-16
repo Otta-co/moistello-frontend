@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CopyButton } from "@/components/shared/copy-button"
-import { cn } from "@/lib/cn"
 import type { Invite } from "@/types"
 
 const sectionVariants = {

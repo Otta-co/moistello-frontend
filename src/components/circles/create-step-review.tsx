@@ -11,7 +11,7 @@ interface CreateStepReviewProps {
   errors?: Record<string, string>
 }
 
-export function CreateStepReview({ formData, isPending, errors = {} }: CreateStepReviewProps) {
+export function CreateStepReview({ formData, errors = {} }: CreateStepReviewProps) {
   const freqLabel = formData.frequency.charAt(0).toUpperCase() + formData.frequency.slice(1)
 
   const rows: { label: string; value: string }[] = [

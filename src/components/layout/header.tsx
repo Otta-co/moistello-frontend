@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { useWalletStore } from "@/stores/wallet-store";
+import { useMultiWallet } from "@/hooks/use-multi-wallet";
 import { useNotificationStore } from "@/stores/notification-store";
 
 const navLinks: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -43,7 +43,7 @@ export function Header({ onToggleMobileMenu, isMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useUIStore();
   const { isAuthenticated, user, logout } = useAuthStore();
-  const { isConnected, address, connect } = useWalletStore();
+  const { isConnected, address } = useMultiWallet();
   const { unreadCount } = useNotificationStore();
   const [showConnectModal, setShowConnectModal] = useState(false);
 
@@ -370,15 +370,11 @@ export function Header({ onToggleMobileMenu, isMobileMenuOpen }: HeaderProps) {
 }
 
 function ConnectWalletModal({ onClose }: { onClose: () => void }) {
-  const { connect, isConnecting, error } = useWalletStore();
+  const { isConnecting, error, setSelectorOpen } = useMultiWallet();
 
-  const handleConnect = async () => {
-    try {
-      await connect();
-      onClose();
-    } catch {
-      // error set in store
-    }
+  const handleConnect = () => {
+    setSelectorOpen(true);
+    onClose();
   };
 
   return (
@@ -406,7 +402,7 @@ function ConnectWalletModal({ onClose }: { onClose: () => void }) {
           Connect Wallet
         </h3>
         <p className="text-sm text-muted-foreground font-body mb-5">
-          Connect your Freighter wallet to access Stellar features.
+          Connect your wallet to access Stellar features.
         </p>
 
         {error && (
@@ -423,18 +419,18 @@ function ConnectWalletModal({ onClose }: { onClose: () => void }) {
           isLoading={isConnecting}
           onClick={handleConnect}
         >
-          {isConnecting ? "Connecting..." : "Connect Freighter"}
+          {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
 
         <p className="mt-3 text-center text-xs text-muted-foreground font-body">
-          Don&apos;t have Freighter?{" "}
+          Need a wallet?{" "}
           <a
-            href="https://freighter.app"
+            href="https://stellar.org/wallets"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[rgb(var(--aurora-cyan))] hover:underline transition-colors"
           >
-            Install it here
+            Find one here
           </a>
         </p>
       </motion.div>

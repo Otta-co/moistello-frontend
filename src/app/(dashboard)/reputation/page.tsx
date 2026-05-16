@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TierCard } from "@/components/reputation/tier-card"
 import { formatCurrency, formatDate } from "@/lib/formatters"
 import { MOI_SCORE_MAX } from "@/lib/constants"
 import { cn } from "@/lib/cn"
@@ -281,6 +282,20 @@ export default function ReputationPage() {
         className="flex justify-center"
       >
         <ScoreGauge score={score} />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+      >
+        <TierCard
+          score={score}
+          streak={breakdown?.streaks ?? 0}
+          completions={breakdown?.completions ?? 0}
+          totalContributed={breakdown?.volume ?? 0}
+          defaults={0}
+        />
       </motion.div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

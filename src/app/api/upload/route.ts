@@ -21,6 +21,7 @@ function isAuthorized(request: NextRequest): boolean {
 
   try {
     const sessions = JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = sessions.find((s: any) => s.token === cookie.value);
     if (!session) return false;
     return Date.now() - session.createdAt < 7 * 24 * 60 * 60 * 1000;
@@ -117,7 +118,8 @@ export async function POST(request: NextRequest) {
 
   try {
     fs.writeFileSync(filePath, content, "utf-8");
-  } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_err) {
     return NextResponse.json(
       { error: "Failed to write file" },
       { status: 500 }

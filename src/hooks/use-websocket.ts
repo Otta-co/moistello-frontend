@@ -78,6 +78,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addNotification]);
 
   const scheduleReconnect = useCallback(() => {

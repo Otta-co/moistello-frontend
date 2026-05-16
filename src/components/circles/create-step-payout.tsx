@@ -25,7 +25,7 @@ const PAYOUT_TYPES: {
   { value: "vote", label: "Vote", description: "Members vote on recipient", icon: <Vote className="h-5 w-5" /> },
 ]
 
-export function CreateStepPayout({ formData, setFormData, errors }: CreateStepPayoutProps) {
+export function CreateStepPayout({ formData, setFormData }: CreateStepPayoutProps) {
   return (
     <div className="space-y-6">
       <h3 className="font-heading text-lg font-semibold text-foreground dark:text-white">

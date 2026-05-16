@@ -1,24 +1,22 @@
 "use client"
 
-import React, { useCallback } from "react"
 import { motion } from "framer-motion"
 import {
-  Wallet,
-  RefreshCw,
   ExternalLink,
   ArrowUpCircle,
   ArrowDownCircle,
-  Coins,
-  DollarSign,
   PlugZap,
 } from "lucide-react"
-import { useWallet } from "@/hooks/use-wallet"
+import { useMultiWallet } from "@/hooks/use-multi-wallet"
 import { PageHeader } from "@/components/shared/page-header"
 import { CopyButton } from "@/components/shared/copy-button"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatAddress } from "@/lib/formatters"
 import { cn } from "@/lib/cn"
+import dynamic from "next/dynamic"
+
+const BalanceDisplay = dynamic(() => import("@/components/wallet/balance-display").then((m) => m.BalanceDisplay), { ssr: false })
 
 interface SimulatedTransaction {
   type: "sent" | "received"
@@ -78,9 +76,10 @@ function WalletConnectCard() {
     isConnecting,
     address,
     error,
-    connect,
     disconnect,
-  } = useWallet()
+    activeWalletId,
+    setSelectorOpen,
+  } = useMultiWallet()
 
   if (!isConnected) {
     return (
@@ -101,7 +100,7 @@ function WalletConnectCard() {
           Connect Your Wallet
         </h3>
         <p className="mb-6 max-w-sm text-sm text-muted-foreground font-body">
-          Connect your Freighter wallet to manage balances and make contributions on Stellar.
+          Connect your wallet to manage balances and make contributions on Stellar.
         </p>
         {error && (
           <motion.p
@@ -115,11 +114,11 @@ function WalletConnectCard() {
         <Button
           variant="primary"
           size="lg"
-          onClick={connect}
+          onClick={() => setSelectorOpen(true)}
           isLoading={isConnecting}
           className="holo-glow"
         >
-          Connect Freighter
+          Connect Wallet
         </Button>
       </motion.div>
     )
@@ -147,7 +146,7 @@ function WalletConnectCard() {
             <CopyButton text={address ?? ""} label="Copy address" />
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={disconnect} className="glass-whisper">
+        <Button variant="outline" size="sm" onClick={() => activeWalletId && disconnect(activeWalletId)} className="glass-whisper">
           Disconnect
         </Button>
       </div>
@@ -155,95 +154,6 @@ function WalletConnectCard() {
   )
 }
 
-function BalanceCards() {
-  const { balance, refreshBalance } = useWallet()
-  const [refreshing, setRefreshing] = React.useState(false)
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true)
-    try {
-      await refreshBalance()
-    } finally {
-      setRefreshing(false)
-    }
-  }, [refreshBalance])
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <motion.div
-        whileHover={{ y: -3, transition: { duration: 0.2 } }}
-        className="glass rounded-2xl p-6 tilt-hover depth-3"
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 shadow-lg">
-              <Coins className="h-6 w-6 text-slate-200" />
-            </div>
-            <div>
-              <p className="text-2xs tracking-wider uppercase text-muted-foreground font-body">
-                XLM Balance
-              </p>
-              <p className="font-heading text-3xl font-bold gradient-text mt-0.5">
-                {balance?.xlm ?? "0.00"} <span className="text-base text-muted-foreground">XLM</span>
-              </p>
-            </div>
-          </div>
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleRefresh}
-            className="flex h-9 w-9 items-center justify-center rounded-lg glass hover:glass-strong transition-colors"
-            title="Refresh balance"
-          >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4 text-muted-foreground",
-                refreshing && "animate-spin gradient-text",
-              )}
-            />
-          </motion.button>
-        </div>
-      </motion.div>
-
-      <motion.div
-        whileHover={{ y: -3, transition: { duration: 0.2 } }}
-        className="glass rounded-2xl p-6 tilt-hover depth-3"
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/40 to-aurora-cyan/40 shadow-lg shadow-emerald-500/10">
-              <DollarSign className="h-6 w-6 text-emerald-300" />
-            </div>
-            <div>
-              <p className="text-2xs tracking-wider uppercase text-muted-foreground font-body">
-                USDC Balance
-              </p>
-              <p className="font-heading text-3xl font-bold gradient-text mt-0.5">
-                {balance?.usdc ?? "0.00"} <span className="text-base text-muted-foreground">USDC</span>
-              </p>
-            </div>
-          </div>
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleRefresh}
-            className="flex h-9 w-9 items-center justify-center rounded-lg glass hover:glass-strong transition-colors"
-            title="Refresh balance"
-          >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4 text-muted-foreground",
-                refreshing && "animate-spin gradient-text",
-              )}
-            />
-          </motion.button>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
 
 function RecentTransactions() {
   return (
@@ -319,7 +229,7 @@ function RecentTransactions() {
 }
 
 export default function WalletPage() {
-  const { isConnected } = useWallet()
+  const { isConnected } = useMultiWallet()
 
   return (
     <div className="space-y-6">
@@ -337,7 +247,7 @@ export default function WalletPage() {
           transition={{ delay: 0.15 }}
           className="space-y-6"
         >
-          <BalanceCards />
+          <BalanceDisplay />
           <RecentTransactions />
         </motion.div>
       )}

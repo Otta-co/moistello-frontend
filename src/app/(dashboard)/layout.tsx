@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { useRequireAuth } from "@/hooks/use-auth"
-import { cn } from "@/lib/cn"
 
 export default function DashboardRootLayout({
   children,

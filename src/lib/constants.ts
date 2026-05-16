@@ -76,6 +76,7 @@ export const Routes = {
   PROFILE: "/reputation",
   PROFILE_SETTINGS: "/settings",
   PROFILE_SCORE: "/reputation",
+  GOVERNANCE: "/governance",
   WALLET: "/wallet",
   NOTIFICATIONS: "/notifications",
   INVITE: (code: string) => `/invite/${code}`,

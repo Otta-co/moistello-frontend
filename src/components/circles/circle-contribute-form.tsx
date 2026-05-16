@@ -5,6 +5,7 @@ import { DollarSign, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatters";
+import { useMultiWallet } from "@/hooks/use-multi-wallet";
 
 interface CircleContributeFormProps {
   circleId: string;
@@ -23,18 +24,21 @@ export function CircleContributeForm({
   onSuccess,
   onCancel,
 }: CircleContributeFormProps) {
+  const { address: publicKey, signMessage } = useMultiWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
+    if (!publicKey) {
+      setError("No wallet connected. Please connect a wallet first.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const { post } = await import("@/lib/api-client");
-      const { signMessage, getFreighterPublicKey } = await import("@/lib/stellar");
-
-      const publicKey = await getFreighterPublicKey();
 
       const payload = {
         circleId,
@@ -90,7 +94,7 @@ export function CircleContributeForm({
               You are about to contribute{" "}
               <strong>{formatCurrency(contributionAmount, currency)}</strong> to{" "}
               <strong>{circleName}</strong>. This transaction will be signed using your
-              Freighter wallet and processed on the Stellar network.
+              connected wallet and processed on the Stellar network.
             </p>
           </div>
 
@@ -119,7 +123,7 @@ export function CircleContributeForm({
           isLoading={isLoading}
           leftIcon={<DollarSign className="h-4 w-4" />}
         >
-          Confirm & Sign with Freighter
+          Confirm &amp; Sign
         </Button>
       </div>
     </div>

@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   const users = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = users.find((u: any) => u.username === username);
 
   if (!user) {

@@ -111,7 +111,9 @@ export default function CreateCirclePage() {
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div key={`step-${currentStep}`} custom={direction} variants={slideVariants}
               initial="enter" animate="center" exit="exit" transition={ANIM}>
-              <StepC {...(stepProps as any)} />
+              <StepC
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                {...(stepProps as any)} />
             </motion.div>
           </AnimatePresence>
         </div>

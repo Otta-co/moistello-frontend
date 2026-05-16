@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   const tokens = JSON.parse(fs.readFileSync(TOKENS_FILE, "utf-8"));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const foundToken = tokens.find((t: any) => t.token === token && !t.used);
 
   if (!foundToken) {
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
 
   // Check username
   const users = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (users.find((u: any) => u.username === username)) {
     return NextResponse.json({ error: "Username already taken" }, { status: 409 });
   }
