@@ -1,57 +1,97 @@
 #!/usr/bin/env bash
 # ── 09-fund-check.sh ── Verify Stellar account is funded
-set -euo pipefail
-echo "=== STEP 09: Verify Stellar account setup ==="
-source /opt/moistello/secrets/.env
+source "$(dirname "$0")/lib/common.sh"
 
-# Check for placeholder
-if [ "${STELLAR_SECRET_KEY:-}" = "REPLACE_WITH_YOUR_PRIVATE_KEY" ] || [ "${STELLAR_PUBLIC_KEY:-}" = "REPLACE_WITH_YOUR_PUBLIC_KEY" ]; then
+step_header "STEP 09: Verifying Stellar account funding"
+
+if skip_if_done "09"; then exit 0; fi
+
+require_command curl
+
+ENV_FILE="$APP_DIR/secrets/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    fail "Secrets file not found at $ENV_FILE — run 08-secrets.sh first"
+fi
+
+source "$ENV_FILE"
+
+# ── Check for placeholder keys ─────────────────────────────────
+if [ "${STELLAR_SECRET_KEY:-}" = "REPLACE_WITH_YOUR_PRIVATE_KEY" ] || \
+   [ "${STELLAR_PUBLIC_KEY:-}" = "REPLACE_WITH_YOUR_PUBLIC_KEY" ]; then
+    warn "Placeholder Stellar keys detected"
     echo ""
-    echo "⚠  No Stellar keypair set yet."
+    info "Edit the secrets file with your real keys:"
+    info "  vi $ENV_FILE"
     echo ""
-    echo "Edit this file with your real keys:"
-    echo "  vi /opt/moistello/secrets/.env"
+    info "Replace these lines:"
+    info "  STELLAR_SECRET_KEY=REPLACE_WITH_YOUR_PRIVATE_KEY"
+    info "  STELLAR_PUBLIC_KEY=REPLACE_WITH_YOUR_PUBLIC_KEY"
     echo ""
-    echo "Replace these two lines:"
-    echo "  STELLAR_SECRET_KEY=REPLACE_WITH_YOUR_PRIVATE_KEY"
-    echo "  STELLAR_PUBLIC_KEY=REPLACE_WITH_YOUR_PUBLIC_KEY"
+    info "With your actual keys (generate at https://lab.stellar.org):"
+    info "  STELLAR_SECRET_KEY=S..."
+    info "  STELLAR_PUBLIC_KEY=G..."
     echo ""
-    echo "With your actual keys from lab.stellar.org:"
-    echo "  STELLAR_SECRET_KEY=S..."
-    echo "  STELLAR_PUBLIC_KEY=GDX5F7KGWZ5DO7PPSWXHVOG45L7HH2YEDODKRFRC5SYHJILNARXQL3GA"
+    info "Fund the account with at least 10 XLM on $NETWORK."
+    info "Then re-run this script."
     echo ""
-    echo "Then ensure the account is funded with at least 200 XLM on mainnet."
-    echo "Re-run this step after editing."
-    exit 1
+    fail "Cannot proceed with placeholder keys"
 fi
 
 if [ -z "${STELLAR_PUBLIC_KEY:-}" ]; then
-    echo "ERROR: No Stellar public key found. Run 08-secrets.sh first."
-    exit 1
+    fail "STELLAR_PUBLIC_KEY is empty or not set in $ENV_FILE"
 fi
 
-# Check balance on mainnet
-BALANCE=$(curl -sf "https://horizon.stellar.org/accounts/${STELLAR_PUBLIC_KEY}" \
-    | python3 -c "
-import json,sys
+# ── Query Horizon for account balance ──────────────────────────
+info "Querying $STELLAR_HORIZON for account: ${STELLAR_PUBLIC_KEY:0:12}..."
+
+ACCOUNT_JSON=$(run curl -sf "${STELLAR_HORIZON}/accounts/${STELLAR_PUBLIC_KEY}" 2>&1) || true
+
+if [ -z "$ACCOUNT_JSON" ]; then
+    warn "Account not found on $NETWORK (${STELLAR_HORIZON})"
+    echo ""
+    info "Fund this account before proceeding:"
+    info "  1. Buy XLM on an exchange (Kraken, Coinbase, etc.)"
+    info "  2. Withdraw to: ${STELLAR_PUBLIC_KEY}"
+    info "  3. Minimum: 10 XLM (recommended: 200 XLM)"
+    echo ""
+    info "Re-run this script after funding."
+    echo ""
+    fail "Account ${STELLAR_PUBLIC_KEY} not found on $NETWORK"
+fi
+
+BALANCE=$(echo "$ACCOUNT_JSON" | python3 -c "
+import json, sys
 try:
-    data=json.load(sys.stdin)
-    for b in data['balances']:
-        if b['asset_type']=='native': print(b['balance']); break
-except: print('0')
+    data = json.load(sys.stdin)
+    for b in data.get('balances', []):
+        if b.get('asset_type') == 'native':
+            print(b.get('balance', '0'))
+            break
+    else:
+        print('0')
+except Exception:
+    print('0')
 " 2>/dev/null || echo "0")
 
-if [ "$BALANCE" = "0" ] || [ -z "$BALANCE" ]; then
-    echo "Account not found on mainnet or zero balance."
+info "Account found — native balance: $BALANCE XLM"
+
+# ── Numeric comparison: require >= 10 XLM ──────────────────────
+MIN_BALANCE=10
+if [ "$(echo "$BALANCE < $MIN_BALANCE" | bc -l 2>/dev/null || echo 1)" = "1" ]; then
+    warn "Account balance ($BALANCE XLM) is below minimum ($MIN_BALANCE XLM)"
     echo ""
-    echo "FUND THIS ACCOUNT before proceeding:"
-    echo "  1. Buy XLM on Kraken/Coinbase"
-    echo "  2. Withdraw to: ${STELLAR_PUBLIC_KEY}"
-    echo "  3. Minimum: 200 XLM"
+    info "Add more XLM to this account:"
+    info "  Address: ${STELLAR_PUBLIC_KEY}"
+    info "  Current balance: $BALANCE XLM"
+    info "  Required minimum: $MIN_BALANCE XLM"
+    info "  Recommended: 200 XLM (for ~5 contract deployments)"
     echo ""
-    echo "Re-run this script after funding."
-    exit 1
+    info "Re-run this script after funding."
+    echo ""
+    fail "Insufficient balance on $NETWORK"
 fi
 
-echo "Balance: $BALANCE XLM ✓"
-echo "PASSED"
+ok "Account balance ($BALANCE XLM) meets minimum requirement ($MIN_BALANCE XLM)"
+
+mark_done "09"
+ok "Funding check complete"
