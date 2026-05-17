@@ -18,10 +18,10 @@ if [ -n "${STELLAR_SECRET_KEY:-}" ]; then
     STELLAR_PUBLIC=$(stellar keys address "$STELLAR_SECRET" 2>/dev/null || echo "INVALID_KEY")
     echo "Using provided Stellar keypair"
 else
-    OUT=$(stellar keys generate --no-fund 2>&1 || true)
-    STELLAR_PUBLIC=$(echo "$OUT" | grep -oP 'G[A-Z2-7]{55}' | head -1)
-    STELLAR_SECRET=$(echo "$OUT" | grep -oP 'S[A-Z2-7]{55}' | head -1)
-    echo "New Stellar keypair generated"
+    # Placeholder — user edits before running step 10
+    STELLAR_SECRET="REPLACE_WITH_YOUR_PRIVATE_KEY"
+    STELLAR_PUBLIC="REPLACE_WITH_YOUR_PUBLIC_KEY"
+    echo "Placeholder Stellar keypair written — edit .env with your real keys"
 fi
 
 # JWT keys

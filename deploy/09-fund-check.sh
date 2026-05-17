@@ -1,8 +1,29 @@
 #!/usr/bin/env bash
 # ── 09-fund-check.sh ── Verify Stellar account is funded
 set -euo pipefail
-echo "=== STEP 09: Verify Stellar account is funded ==="
+echo "=== STEP 09: Verify Stellar account setup ==="
 source /opt/moistello/secrets/.env
+
+# Check for placeholder
+if [ "${STELLAR_SECRET_KEY:-}" = "REPLACE_WITH_YOUR_PRIVATE_KEY" ] || [ "${STELLAR_PUBLIC_KEY:-}" = "REPLACE_WITH_YOUR_PUBLIC_KEY" ]; then
+    echo ""
+    echo "⚠  No Stellar keypair set yet."
+    echo ""
+    echo "Edit this file with your real keys:"
+    echo "  vi /opt/moistello/secrets/.env"
+    echo ""
+    echo "Replace these two lines:"
+    echo "  STELLAR_SECRET_KEY=REPLACE_WITH_YOUR_PRIVATE_KEY"
+    echo "  STELLAR_PUBLIC_KEY=REPLACE_WITH_YOUR_PUBLIC_KEY"
+    echo ""
+    echo "With your actual keys from lab.stellar.org:"
+    echo "  STELLAR_SECRET_KEY=S..."
+    echo "  STELLAR_PUBLIC_KEY=GDX5F7KGWZ5DO7PPSWXHVOG45L7HH2YEDODKRFRC5SYHJILNARXQL3GA"
+    echo ""
+    echo "Then ensure the account is funded with at least 200 XLM on mainnet."
+    echo "Re-run this step after editing."
+    exit 1
+fi
 
 if [ -z "${STELLAR_PUBLIC_KEY:-}" ]; then
     echo "ERROR: No Stellar public key found. Run 08-secrets.sh first."
