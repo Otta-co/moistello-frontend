@@ -77,7 +77,12 @@ info "Account found — native balance: $BALANCE XLM"
 
 # ── Numeric comparison: require >= 10 XLM ──────────────────────
 MIN_BALANCE=10
-if [ "$(echo "$BALANCE < $MIN_BALANCE" | bc -l 2>/dev/null || echo 1)" = "1" ]; then
+INSUFFICIENT=$(python3 -c "
+b = float('${BALANCE:-0}')
+print('1' if b < ${MIN_BALANCE} else '0')
+" 2>/dev/null || echo "1")
+
+if [ "$INSUFFICIENT" = "1" ]; then
     warn "Account balance ($BALANCE XLM) is below minimum ($MIN_BALANCE XLM)"
     echo ""
     info "Add more XLM to this account:"

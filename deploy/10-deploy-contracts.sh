@@ -27,6 +27,28 @@ if [ ! -d "$CONTRACTS_DIR" ]; then
     fail "Contracts directory not found at $CONTRACTS_DIR — run 01-bootstrap.sh first (repos already cloned)"
 fi
 
+# ── Skip if all contracts already deployed ──────────────────────
+FACTORY_SET="${CONTRACT_FACTORY:-}"
+CIRCLE_SET="${CONTRACT_CIRCLE_HASH:-}"
+REP_SET="${CONTRACT_REP_REGISTRY:-}"
+TOKEN_SET="${CONTRACT_GOV_TOKEN:-}"
+TREASURY_SET="${CONTRACT_TREASURY:-}"
+
+if [[ "$FACTORY_SET" =~ ^C[A-Z0-9]{55}$ ]] && \
+   [[ "$CIRCLE_SET" =~ ^[a-f0-9]{64}$ ]] && \
+   [[ "$REP_SET" =~ ^C[A-Z0-9]{55}$ ]] && \
+   [[ "$TOKEN_SET" =~ ^C[A-Z0-9]{55}$ ]] && \
+   [[ "$TREASURY_SET" =~ ^C[A-Z0-9]{55}$ ]]; then
+    info "All 5 contracts already deployed — skipping"
+    info "  Factory: $FACTORY_SET"
+    info "  Circle hash: $CIRCLE_SET"
+    info "  Reputation: $REP_SET"
+    info "  Token: $TOKEN_SET"
+    info "  Treasury: $TREASURY_SET"
+    mark_done "$STEP"
+    exit 0
+fi
+
 # ── Ensure soroban CLI is available (C4 fix) ───────────────────
 if ! command -v soroban &>/dev/null; then
     info "soroban CLI not found — installing via cargo"
@@ -58,7 +80,12 @@ echo ""
 # ── Confirmation prompt (H4 fix) ───────────────────────────────
 if [ "$DRY_RUN" != "true" ]; then
     echo -n "Proceed with contract deployment on ${NETWORK}? This will spend real XLM. [y/N]: "
-    read -r CONFIRM
+    if [ "${YES:-false}" = "true" ]; then
+        info "Auto-confirming (YES=true)"
+        CONFIRM="y"
+    else
+        read -r CONFIRM
+    fi
     if [ "${CONFIRM:-}" != "y" ] && [ "${CONFIRM:-}" != "Y" ]; then
         warn "Deployment cancelled by user"
         exit 0
@@ -69,22 +96,16 @@ fi
 
 echo ""
 
-# ── Configure soroban identity ─────────────────────────────────
-info "Configuring soroban identity: moistello-deploy"
-run soroban config identity generate moistello-deploy \
-    --rpc-url "$STELLAR_RPC" \
-    --network-passphrase "$STELLAR_PASSPHRASE" \
-    --secret-key "$STELLAR_SECRET_KEY" 2>/dev/null || true
-ok "Soroban identity configured"
+# ── Soroban CLI v26: pass secret key + network directly, no identity config needed
+SOROBAN="soroban --rpc-url \"$STELLAR_RPC\" --network-passphrase \"$STELLAR_PASSPHRASE\""
 
 # ── Build contracts ────────────────────────────────────────────
-info "Building all contracts (wasm32-unknown-unknown, release mode)"
-run cargo build --target wasm32-unknown-unknown --release || \
+info "Building all contracts (wasm32v1-none, release mode)"
+cd "$CONTRACTS_DIR"
+run cargo build --target wasm32v1-none --release || \
     fail "Contract build failed — check $CONTRACTS_DIR for errors"
-ok "Contracts built successfully"
 
-# ── Optimize WASM binaries ─────────────────────────────────────
-WASM_DIR="$CONTRACTS_DIR/target/wasm32-unknown-unknown/release"
+WASM_DIR="$CONTRACTS_DIR/target/wasm32v1-none/release"
 CONTRACTS=(circle_factory circle reputation_registry governance_token treasury)
 
 info "Optimizing WASM binaries"
@@ -121,10 +142,11 @@ deploy_contract() {
     info "Deploying ${label}: ${wasm_name}"
 
     local result
-    result=$(run soroban contract deploy \
+    result=$(soroban contract deploy \
         --wasm "${WASM_DIR}/${wasm_name}.optimized.wasm" \
-        --source moistello-deploy \
-        --network "$NETWORK" 2>&1) || true
+        --source-account "$STELLAR_SECRET_KEY" \
+        --rpc-url "$STELLAR_RPC" \
+        --network-passphrase "$STELLAR_PASSPHRASE" 2>&1 | tail -1) || true
 
     if [ -n "$result" ] && [[ "$result" =~ ^C[A-Z0-9]{55}$ ]]; then
         echo "$result"
@@ -143,12 +165,13 @@ else
     FAILED+=("circle_factory")
 fi
 
-# 2/5: Circle (WASM install, not deploy)
-info "Deploying 2/5: Circle WASM (install)"
-CIRCLE_HASH=$(run soroban contract install \
+# 2/5: Circle (WASM upload, not deploy)
+info "Deploying 2/5: Circle WASM (upload)"
+CIRCLE_HASH=$(soroban contract upload \
     --wasm "${WASM_DIR}/circle.optimized.wasm" \
-    --source moistello-deploy \
-    --network "$NETWORK" 2>&1) || CIRCLE_HASH=""
+    --source-account "$STELLAR_SECRET_KEY" \
+    --rpc-url "$STELLAR_RPC" \
+    --network-passphrase "$STELLAR_PASSPHRASE" 2>&1 | tail -1) || CIRCLE_HASH=""
 
 if [ -n "$CIRCLE_HASH" ] && [[ "$CIRCLE_HASH" =~ ^[a-f0-9]{64}$ ]]; then
     ok "Circle WASM hash: $CIRCLE_HASH"

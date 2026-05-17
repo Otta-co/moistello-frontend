@@ -16,7 +16,7 @@ SWAP_SIZE_MB=2048
 # ── Check if swap is already active ─────────────────────────────
 if swapon --show 2>/dev/null | grep -q '^/' ; then
     ok "Swap is already active — current configuration:"
-    swapon --show 2>/dev/null | log
+    swapon --show 2>/dev/null | while read -r line; do log "$line"; done
     mark_done "$STEP"
     step_end
     exit 0

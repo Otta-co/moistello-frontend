@@ -18,8 +18,8 @@ for entry in "${REPOS[@]}"; do
     target="${APP_DIR}/${dir_name}"
 
     if [ -d "${target}/.git" ]; then
-        # Repo exists — verify it's not a broken shallow clone
-        if git -C "$target" rev-parse HEAD &>/dev/null; then
+        # Repo exists — verify with lightweight check
+        if git -C "$target" status --porcelain &>/dev/null; then
             ok "${repo_name} already exists at $target"
             # Attempt to fetch and update if shallow
             if git -C "$target" rev-parse --is-shallow-repository &>/dev/null; then

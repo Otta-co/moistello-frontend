@@ -34,8 +34,18 @@ run curl -fsSL "$GO_URL" -o "/tmp/${GO_TARBALL}"
 
 # ── Download and verify SHA256 checksum ─────────────────────────
 info "Verifying SHA256 checksum"
-CHECKSUMS_URL="https://go.dev/dl/${GO_TARBALL}.sha256"
-EXPECTED_SHA256=$(run curl -fsSL "$CHECKSUMS_URL" 2>/dev/null | awk '{print $1}')
+# Fetch checksum from Go downloads page (no .sha256 files served directly)
+EXPECTED_SHA256=$(run curl -fsSL "https://go.dev/dl/?mode=json" 2>/dev/null \
+    | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+for f in data:
+    if f.get('version','') == 'go${GO_VERSION}':
+        for d in f.get('files',[]):
+            if d.get('filename','') == '${GO_TARBALL}':
+                print(d.get('sha256',''))
+                break
+" 2>/dev/null)
 
 if [ -n "$EXPECTED_SHA256" ]; then
     ACTUAL_SHA256=$(sha256sum "/tmp/${GO_TARBALL}" | awk '{print $1}')
@@ -45,7 +55,7 @@ if [ -n "$EXPECTED_SHA256" ]; then
         fail "SHA256 mismatch — expected $EXPECTED_SHA256, got $ACTUAL_SHA256"
     fi
 else
-    warn "Could not fetch checksum from $CHECKSUMS_URL — skipping verification"
+    warn "Could not fetch checksum from go.dev API — skipping verification"
 fi
 
 # ── Backup existing Go installation ─────────────────────────────
@@ -65,13 +75,13 @@ run rm -f "/tmp/${GO_TARBALL}"
 # ── Set up profile for login shells ─────────────────────────────
 info "Setting up /etc/profile.d/go.sh"
 cat > /etc/profile.d/go.sh <<'GOEOF'
-export PATH=$PATH:/usr/local/go/bin
+export PATH=/usr/local/go/bin:$PATH
 GOEOF
 run chmod 644 /etc/profile.d/go.sh
 ok "Created /etc/profile.d/go.sh"
 
 # Make Go available in the current shell
-export PATH="$PATH:/usr/local/go/bin"
+export PATH="/usr/local/go/bin:$PATH"
 
 # ── Verify installation ─────────────────────────────────────────
 if ! command -v go &>/dev/null; then

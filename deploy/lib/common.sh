@@ -14,7 +14,8 @@ export DRY_RUN="${DRY_RUN:-false}"
 # Derive Stellar URLs from network
 if [ "$NETWORK" = "mainnet" ]; then
     export STELLAR_HORIZON="https://horizon.stellar.org"
-    export STELLAR_RPC="https://soroban.stellar.org"
+    # Prefer user's custom RPC from .env, fall back to public endpoint
+    export STELLAR_RPC="${STELLAR_RPC_URL:-https://mainnet.sorobanrpc.com}"
     export STELLAR_PASSPHRASE="Public Global Stellar Network ; September 2015"
 else
     export STELLAR_HORIZON="https://horizon-testnet.stellar.org"
@@ -32,7 +33,7 @@ _init_log() {
     mkdir -p "$LOG_DIR"
 }
 
-log()   { _init_log; echo -e "[$(date -Iseconds)] $1" | tee -a "$_LOGFILE"; }
+log()   { _init_log; echo -e "[$(date -Iseconds)] $1" | tee -a "$_LOGFILE" >&2; }
 ok()    { log "  ${G}✓${N} $1"; }
 warn()  { log "  ${Y}⚠${N}  $1"; }
 fail()  { log "  ${R}✗${N} $1"; exit 1; }
