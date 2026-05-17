@@ -86,7 +86,7 @@ if ! swapon --show 2>/dev/null | grep -q "$SWAPFILE"; then
 fi
 
 ok "Swap is active:"
-swapon --show 2>/dev/null | log
+swapon --show 2>/dev/null | while read -r line; do log "$line"; done
 
 # ── Mark step complete ──────────────────────────────────────────
 mark_done "$STEP"
