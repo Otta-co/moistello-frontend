@@ -2,6 +2,7 @@
 # ────────────────────────────────────────────────────────────────
 #  Moistello — One-Touch Production Deploy Script
 #  Target: moistello.com  |  OS: Ubuntu 24.04 LTS
+#  Network: mainnet (set NETWORK at top to change)
 #  Usage:  bash deploy.sh
 # ────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -16,6 +17,19 @@ info() { echo -e "  ${B}→${N} $1"; }
 step() { echo -e "\n${W}═══ $1 ═══${N}"; }
 
 # ── Config ─────────────────────────────────────────────────────
+# Set NETWORK to "mainnet" or "testnet"
+NETWORK="mainnet"
+
+if [[ "$NETWORK" == "mainnet" ]]; then
+    STELLAR_HORIZON="https://horizon.stellar.org"
+    STELLAR_RPC="https://soroban.stellar.org"
+    STELLAR_PASSPHRASE="Public Global Stellar Network ; September 2015"
+else
+    STELLAR_HORIZON="https://horizon-testnet.stellar.org"
+    STELLAR_RPC="https://soroban-testnet.stellar.org"
+    STELLAR_PASSPHRASE="Test SDF Network ; September 2015"
+fi
+
 DOMAIN="moistello.com"
 WWW_DOMAIN="www.${DOMAIN}"
 APP_DIR="/opt/moistello"
@@ -219,10 +233,10 @@ MOISTELLO_RATE_LIMIT_GLOBAL=100
 MOISTELLO_RATE_LIMIT_AUTHENTICATED=300
 MOISTELLO_RATE_LIMIT_AUTH=10
 
-MOISTELLO_STELLAR_NETWORK=testnet
-MOISTELLO_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
-MOISTELLO_STELLAR_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
-MOISTELLO_STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
+MOISTELLO_STELLAR_NETWORK=${NETWORK}
+MOISTELLO_STELLAR_HORIZON_URL=${STELLAR_HORIZON}
+MOISTELLO_STELLAR_SOROBAN_RPC_URL=${STELLAR_RPC}
+MOISTELLO_STELLAR_NETWORK_PASSPHRASE=${STELLAR_PASSPHRASE}
 MOISTELLO_STELLAR_MASTER_PUBLIC_KEY=${STELLAR_PUBLIC}
 MOISTELLO_STELLAR_MASTER_SECRET_KEY=${STELLAR_SECRET}
 ENVEOF
@@ -638,15 +652,25 @@ cat << SUMMARY
      Health:    tail -f ${LOG_DIR}/health.log
      Backups:   tail -f ${LOG_DIR}/backup.log
 
-   ── Post-Deploy ──────────────────────────────────────────
-   ① Fund Stellar testnet account:
-      ${STELLAR_PUBLIC}
-      → https://laboratory.stellar.org/#account-creator
+    ── Post-Deploy ──────────────────────────────────────────
+    ① Fund Stellar ${NETWORK} account with XLM:
 
-   ② If SSL skipped (DNS not propagated yet):
-      certbot --nginx -d ${DOMAIN} -d ${WWW_DOMAIN} --non-interactive --agree-tos --email admin@${DOMAIN}
+       PUBLIC KEY:
+       ${STELLAR_PUBLIC}
 
-   ③ Verify:
-      curl -s https://${DOMAIN}/health
-      curl -sI https://${DOMAIN} | head -5
+       How to fund:
+         - Buy XLM on Kraken/Coinbase → withdraw to the public key above
+         - OR send XLM from an existing Stellar wallet (LOBSTR, Freighter)
+
+       Minimum needed: ~75 XLM (~\$12 for account reserve + contract deployment + buffer)
+       Recommended:    200 XLM (~\$30 for enterprise comfort)
+
+      ⚠  This is ${NETWORK} — real XLM costs money. Not testnet faucet.
+
+    ② If SSL skipped (DNS not propagated yet):
+       certbot --nginx -d ${DOMAIN} -d ${WWW_DOMAIN} --non-interactive --agree-tos --email admin@${DOMAIN}
+
+    ③ Verify:
+       curl -s https://${DOMAIN}/health
+       curl -sI https://${DOMAIN} | head -5
 SUMMARY
