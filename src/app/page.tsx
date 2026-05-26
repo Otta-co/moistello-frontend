@@ -18,13 +18,6 @@ const features = [
   { icon: Coins, title: "Multi-Currency", description: "USDC and XLM today. More stablecoins coming.", colSpan: "lg:col-span-1" },
 ];
 
-const stats = [
-  { value: "10,000+", label: "Circles Created" },
-  { value: "50,000+", label: "Members Worldwide" },
-  { value: "$2M+", label: "In Payouts" },
-  { value: "99.9%", label: "On-Time Rate" },
-];
-
 export default function Home() {
   return (
     <PublicLayout>
@@ -84,19 +77,19 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Stats */}
-        <section className="relative z-10 py-12">
-          <div className="container-premium">
-            <div className="glass-flagship rounded-3xl max-w-5xl mx-auto p-8 md:p-12">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                {stats.map((stat) => (
-                  <div key={stat.label}>
-                    <p className="gradient-text-extended font-heading text-3xl md:text-5xl font-bold">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground mt-2">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Contracts */}
+        <section className="relative z-10 py-24 md:py-32 bg-gradient-to-b from-black via-black/95 to-transparent">
+          <div className="container-premium text-center">
+            <div className="w-12 h-px bg-white/20 mx-auto mb-8" />
+            <p className="text-white font-heading text-[180px] md:text-[280px] font-black leading-none tracking-tighter select-none">
+              5
+            </p>
+            <p className="text-white/60 font-mono text-xs tracking-[0.3em] uppercase">
+              Soroban Contracts &middot; Mainnet
+            </p>
+            <p className="text-white/20 font-mono text-[10px] tracking-wider mt-6 max-w-2xl mx-auto leading-relaxed">
+              SavingsVault &middot; MilestoneNFT &middot; Reputation &middot; Governance &middot; MoistelloCore
+            </p>
           </div>
         </section>
 
