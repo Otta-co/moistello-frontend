@@ -17,7 +17,7 @@ step_header "Frontend"
 if [ -d "$FRONTEND_DIR" ]; then
     info "Pulling latest..."
     cd "$FRONTEND_DIR"
-    run git pull origin main
+    run git pull origin master
 
     info "Installing dependencies..."
     run npm ci
@@ -35,7 +35,7 @@ step_header "Backend"
 if [ -d "$BACKEND_DIR" ]; then
     info "Pulling latest..."
     cd "$BACKEND_DIR"
-    run git pull origin main
+    run git pull origin master
 
     info "Downloading Go modules..."
     run go mod download
