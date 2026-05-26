@@ -29,7 +29,7 @@ services:
       POSTGRES_USER: moistello
       POSTGRES_PASSWORD: "${POSTGRES_PW}"
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:9811:5432"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -40,7 +40,7 @@ services:
   redis:
     command: redis-server --requirepass "${REDIS_PW}" --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:9808:6379"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -53,8 +53,8 @@ services:
       RABBITMQ_DEFAULT_USER: moistello
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PW}"
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:9809:5672"
+      - "127.0.0.1:9810:15672"
     restart: unless-stopped
     logging:
       driver: "json-file"

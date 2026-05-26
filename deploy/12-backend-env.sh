@@ -45,9 +45,9 @@ cat > "$BACKEND_ENV" << ENVEOF
 MOISTELLO_ENVIRONMENT=production
 MOISTELLO_SERVER_PORT=1100
 MOISTELLO_SERVER_HOST=127.0.0.1
-MOISTELLO_DATABASE_URL=postgres://moistello:${POSTGRES_PW}@127.0.0.1:5432/moistello?sslmode=disable
-MOISTELLO_REDIS_URL=redis://:${REDIS_PW}@127.0.0.1:6379
-MOISTELLO_RABBITMQ_URL=amqp://moistello:${RABBITMQ_PW}@127.0.0.1:5672/
+MOISTELLO_DATABASE_URL=postgres://moistello:${POSTGRES_PW}@127.0.0.1:9811/moistello?sslmode=disable
+MOISTELLO_REDIS_URL=redis://:${REDIS_PW}@127.0.0.1:9808
+MOISTELLO_RABBITMQ_URL=amqp://moistello:${RABBITMQ_PW}@127.0.0.1:9809/
 MOISTELLO_AUTH_JWT_PRIVATE_KEY_PATH=/opt/moistello/backend/config/keys/jwt-private.pem
 MOISTELLO_AUTH_JWT_PUBLIC_KEY_PATH=/opt/moistello/backend/config/keys/jwt-public.pem
 MOISTELLO_AUTH_ACCESS_TOKEN_TTL=15m

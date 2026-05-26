@@ -8,8 +8,14 @@ step_header "STEP 14: Starting Docker Services"
 COMPOSE_DIR="${APP_DIR}/backend"
 BASE_COMPOSE="${COMPOSE_DIR}/docker-compose.yml"
 PROD_COMPOSE="${COMPOSE_DIR}/docker-compose.prod.yml"
+SECRETS_FILE="${APP_DIR}/secrets/.env"
 
 require_command docker
+
+# ── Verify secrets file exists ─────────────────────────────────
+if [ ! -f "$SECRETS_FILE" ]; then
+    fail "Secrets file not found: $SECRETS_FILE — run 08-secrets.sh first"
+fi
 
 # ── Check Docker daemon is running ─────────────────────────────
 if ! docker info &>/dev/null; then
@@ -27,11 +33,11 @@ fi
 
 # ── Pull images ────────────────────────────────────────────────
 info "Pulling Docker images..."
-run docker compose -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" pull
+run docker compose --env-file "$SECRETS_FILE" -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" pull
 
 # ── Start services ─────────────────────────────────────────────
 info "Starting services (with --wait --remove-orphans)..."
-run docker compose -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" up -d --wait --remove-orphans
+run docker compose --env-file "$SECRETS_FILE" -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" up -d --wait --remove-orphans
 
 # ── Wait for all services healthy ──────────────────────────────
 MAX_ATTEMPTS=30
@@ -40,9 +46,9 @@ info "Waiting for all services to become healthy (max ${MAX_ATTEMPTS} attempts, 
 
 HEALTHY=false
 for attempt in $(seq 1 $MAX_ATTEMPTS); do
-    # Count unhealthy or starting services
-    UNHEALTHY_COUNT=$(docker compose -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" ps --format json 2>/dev/null | \
-        python3 -c "import sys,json; data=[json.loads(l) for l in sys.stdin.readlines()]; print(sum(1 for d in data if d.get('Health','') not in ('healthy','')))" 2>/dev/null || echo 999)
+     # Count unhealthy or starting services
+     UNHEALTHY_COUNT=$(docker compose --env-file "$SECRETS_FILE" -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" ps --format json 2>/dev/null | \
+         python3 -c "import sys,json; data=[json.loads(l) for l in sys.stdin.readlines()]; print(sum(1 for d in data if d.get('Health','') not in ('healthy','')))" 2>/dev/null || echo 999)
 
     if [ "$UNHEALTHY_COUNT" = "0" ]; then
         HEALTHY=true
@@ -54,10 +60,10 @@ for attempt in $(seq 1 $MAX_ATTEMPTS); do
 done
 
 if [ "$HEALTHY" = false ]; then
-    warn "Some services did not become healthy within timeout"
-    info "Docker compose logs (last 50 lines per service):"
-    run docker compose -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" logs --tail 50
-    fail "One or more services failed to reach healthy state — check logs above"
+     warn "Some services did not become healthy within timeout"
+     info "Docker compose logs (last 50 lines per service):"
+     run docker compose --env-file "$SECRETS_FILE" -f "$BASE_COMPOSE" -f "$PROD_COMPOSE" logs --tail 50
+     fail "One or more services failed to reach healthy state — check logs above"
 fi
 
 ok "All services healthy"
