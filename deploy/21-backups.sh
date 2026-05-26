@@ -21,7 +21,8 @@ if ! command -v crontab &>/dev/null; then
 fi
 
 mkdir -p "$(dirname "$BACKUP_SCRIPT")" "$BACKUP_DIR" "$LOG_DIR"
-chown deploy:deploy "$LOG_DIR"
+chown -R deploy:deploy "$LOG_DIR"
+rm -f "${LOG_DIR}/backup.log"
 
 cat > "${BACKUP_SCRIPT}" << 'BACKEOF'
 #!/usr/bin/env bash
