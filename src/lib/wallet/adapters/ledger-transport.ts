@@ -56,7 +56,7 @@ export async function createTransport(type: TransportType): Promise<LedgerTransp
     }
     case "webble": {
       try {
-        const TransportWebBLE = (await import("@ledgerhq/hw-transport-webble")).default
+        const TransportWebBLE = (await import("@ledgerhq/hw-transport-web-ble")).default
         return {
           type: "webble",
           isSupported: () => "bluetooth" in navigator,

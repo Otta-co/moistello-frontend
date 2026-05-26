@@ -50,10 +50,10 @@ fi
 if [ ! -f "$MIGRATE_BIN" ]; then
     info "Building migrate tool..."
     if [ ! -d "$BACKEND_DIR" ]; then
-        fail "Backend directory not found: $BACKEND_DIR"
-    fi
-    run go build -o "$MIGRATE_BIN" ./cmd/migrate
-    ok "Migrate tool built: $MIGRATE_BIN"
+         fail "Backend directory not found: $BACKEND_DIR"
+     fi
+     (cd "$BACKEND_DIR" && run go build -o "$MIGRATE_BIN" ./cmd/migrate)
+     ok "Migrate tool built: $MIGRATE_BIN"
 else
     ok "Migrate tool already exists: $MIGRATE_BIN"
 fi

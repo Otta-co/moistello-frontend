@@ -50,7 +50,7 @@ declare module "@ledgerhq/hw-transport-webusb" {
   export default TransportWebUSB
 }
 
-declare module "@ledgerhq/hw-transport-webble" {
+declare module "@ledgerhq/hw-transport-web-ble" {
   export interface LedgerTransport {
     close(): Promise<void>
   }
