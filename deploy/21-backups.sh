@@ -11,7 +11,17 @@ CRON_SCHEDULE="0 */6 * * *"
 
 info "Creating backup script at ${BACKUP_SCRIPT}"
 
+# Ensure cron is installed
+if ! command -v crontab &>/dev/null; then
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y -qq cron
+    elif command -v yum &>/dev/null; then
+        yum install -y -q cronie
+    fi
+fi
+
 mkdir -p "$(dirname "$BACKUP_SCRIPT")" "$BACKUP_DIR" "$LOG_DIR"
+chown deploy:deploy "$LOG_DIR"
 
 cat > "${BACKUP_SCRIPT}" << 'BACKEOF'
 #!/usr/bin/env bash
