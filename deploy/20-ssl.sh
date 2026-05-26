@@ -16,7 +16,6 @@ EMAIL="${SSL_EMAIL:-admin@${DOMAIN}}"
 # ── DNS check ──────────────────────────────────────────────
 info "Checking DNS for $DOMAIN..."
 
-# Try getent hosts first, then dig, then public IP comparison
 DIG_INSTALLED=false
 command -v dig &>/dev/null && DIG_INSTALLED=true
 
@@ -44,7 +43,7 @@ fi
 if ! $DNS_OK; then
     warn "DNS for $DOMAIN does not resolve to this server ($SERVER_IP)"
     warn "Skipping SSL issuance. Run this step again after DNS propagates."
-    warn "  certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email $EMAIL"
+    warn "  certbot certonly --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email $EMAIL"
     mark_done "20"
     step_end
     exit 0
@@ -54,7 +53,7 @@ ok "DNS verified: $DOMAIN → $SERVER_IP"
 
 # ── Dry-run certificate issuance ───────────────────────────
 info "Running certbot dry-run (to avoid rate limits)..."
-if certbot --nginx \
+if certbot certonly --nginx \
     -d "$DOMAIN" \
     -d "www.$DOMAIN" \
     --non-interactive \
@@ -81,8 +80,6 @@ fi
 
 # ── Uncomment HTTPS server block ───────────────────────────
 info "Enabling HTTPS server block..."
-# Uncomment all config lines in the HTTPS block (lines starting with #server, #    ssl_, #    listen 443, etc.)
-# We match lines from '#server {' (the HTTPS one) to the next '}' at the start of a line
 awk '
 /^#server \{/ { in_ssl=1 }
 in_ssl && /^#/ && !/^# ──/ { sub(/^#/, ""); print; next }
@@ -91,14 +88,11 @@ in_ssl && /^#/ && !/^# ──/ { sub(/^#/, ""); print; next }
 
 # ── Add HTTP → HTTPS redirect ──────────────────────────────
 info "Adding HTTP → HTTPS redirect..."
-# Find the HTTP server block and insert a redirect before location blocks
 sed -i '/server_name __DOMAIN__ www.__DOMAIN__;/{n;/# Security headers/{i\
     return 301 https://$host$request_uri;
 }}' "$NGINX_SITE" 2>/dev/null || {
-    # Fallback: insert after the first 'server_name' inside HTTP block but before security headers
     sed -i "/server_name ${DOMAIN}/a\\    return 301 https://\\\$host\\\$request_uri;" "$NGINX_SITE"
 }
-# Clean up placeholder if any remain
 sed -i "s/__DOMAIN__/${DOMAIN}/g" "$NGINX_SITE"
 
 # ── Validate and reload ────────────────────────────────────
