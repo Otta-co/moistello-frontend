@@ -117,7 +117,7 @@ fi
 # ── Test the backup immediately ─────────────────────────────────
 info "Running test backup now..."
 
-if sudo -u deploy "${BACKUP_SCRIPT}" 2>&1 | tee -a "${LOG_DIR}/backup.log"; then
+if sudo -u deploy "${BACKUP_SCRIPT}"; then
     ok "Test backup completed successfully"
 else
     EC=${PIPESTATUS[0]}
