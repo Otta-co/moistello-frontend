@@ -133,7 +133,7 @@ export function Modal({
             onKeyDown={handleKeyDown}
             tabIndex={-1}
             className={cn(
-              "glass-flagship backdrop-blur-3xl rounded-2xl w-full mx-2 md:mx-0 overflow-hidden",
+              "glass-flagship backdrop-blur-xl rounded-2xl w-full mx-2 md:mx-0 overflow-hidden",
               "shadow-[0_4px_8px_rgba(0,0,0,0.08),0_12px_32px_rgba(0,0,0,0.08),0_24px_64px_rgba(0,0,0,0.12)]",
               sizeClasses[size],
               className,

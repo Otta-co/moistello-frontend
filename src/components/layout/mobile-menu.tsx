@@ -127,12 +127,12 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-0 right-0 bottom-0 z-50 w-[85vw] max-w-[360px]"
+            className="fixed top-0 right-0 bottom-0 z-50 w-[85vw] max-w-[360px] will-change-transform"
           >
             <div
               className={cn(
-                "flex flex-col h-full rounded-l-3xl overflow-hidden",
-                "glass-flagship backdrop-blur-3xl",
+                "flex flex-col h-full rounded-l-2xl overflow-hidden",
+                "glass-flagship backdrop-blur-xl",
                 "border-l border-white/[0.08] dark:border-white/[0.06]",
                 "shadow-[_-12px_0_60px_rgba(0,0,0,0.3)]",
                 "relative",

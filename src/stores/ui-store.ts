@@ -37,16 +37,14 @@ type UIStore = UIState & UIActions;
 export const useUIStore = create<UIStore>()(
   persist(
     (set, get) => ({
-      theme: "dark",
+      theme: "system",
       sidebarOpen: false,
       activeModal: null,
       toasts: [],
 
       toggleTheme: () => {
         const { theme } = get();
-        const next =
-          theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
-        set({ theme: next });
+        set({ theme: theme === "dark" ? "light" : "dark" });
       },
 
       setTheme: (theme: Theme) => set({ theme }),
