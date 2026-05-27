@@ -78,16 +78,16 @@ export default function Home() {
         </section>
 
         {/* Contracts */}
-        <section className="relative z-10 py-24 md:py-32 bg-gradient-to-b from-black via-black/95 to-transparent">
+        <section className="relative z-10 py-24 md:py-32 bg-gradient-to-b from-gray-100/50 via-transparent to-gray-100/50 dark:bg-gradient-to-b dark:from-black dark:via-black/95 dark:to-transparent">
           <div className="container-premium text-center">
-            <div className="w-12 h-px bg-white/20 mx-auto mb-8" />
-            <p className="text-white font-heading text-[180px] md:text-[280px] font-black leading-none tracking-tighter select-none">
+            <div className="w-12 h-px bg-black/20 dark:bg-white/20 mx-auto mb-8" />
+            <p className="text-black dark:text-white font-heading text-[180px] md:text-[280px] font-black leading-none tracking-tighter select-none">
               5
             </p>
-            <p className="text-white/60 font-mono text-xs tracking-[0.3em] uppercase">
+            <p className="text-black/60 dark:text-white/60 font-mono text-xs tracking-[0.3em] uppercase">
               Soroban Contracts &middot; Mainnet
             </p>
-            <p className="text-white/20 font-mono text-[10px] tracking-wider mt-6 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-black/40 dark:text-white/20 font-mono text-[10px] tracking-wider mt-6 max-w-2xl mx-auto leading-relaxed">
               SavingsVault &middot; MilestoneNFT &middot; Reputation &middot; Governance &middot; MoistelloCore
             </p>
           </div>
