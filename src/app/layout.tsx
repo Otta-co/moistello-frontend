@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Space_Grotesk } from "next/font/google"
 import { Inter } from "next/font/google"
 import { JetBrains_Mono } from "next/font/google"
@@ -31,6 +31,9 @@ export const metadata: Metadata = {
   title: "Moistello — Stellar Savings Circles",
   description:
     "Decentralized rotating savings and credit circles on the Stellar blockchain. Save together. Grow together.",
+}
+
+export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#08080c" },
