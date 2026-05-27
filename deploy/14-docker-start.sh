@@ -67,6 +67,17 @@ if [ "$HEALTHY" = false ]; then
 fi
 
 ok "All services healthy"
+
+# ── Sync Postgres password ──
+# The POSTGRES_PASSWORD env var only takes effect on first container init.
+# On subsequent starts, the stored password in the data volume is used,
+# so we must keep it in sync with the current secret.
+info "Syncing Postgres password..."
+source "$SECRETS_FILE"
+docker exec moistello-postgres \
+    psql -U moistello -c "ALTER USER moistello WITH PASSWORD '${POSTGRES_PW}';" >/dev/null
+ok "Postgres password synced"
+
 ok "Docker services started successfully"
 
 mark_done "14"
