@@ -12,25 +12,7 @@ BIN_DIR="$APP_DIR/bin"
 
 step_header "Rebuild Moistello"
 
-# ── Frontend ──
-step_header "Frontend"
-if [ -d "$FRONTEND_DIR" ]; then
-    info "Pulling latest..."
-    cd "$FRONTEND_DIR"
-    run git pull origin master
-
-    info "Installing dependencies..."
-    run npm ci
-
-    info "Building..."
-    run npm run build
-
-    ok "Frontend build complete"
-else
-    warn "Frontend directory not found at $FRONTEND_DIR — skipping"
-fi
-
-# ── Backend ──
+# ── Backend (fast) ──
 step_header "Backend"
 if [ -d "$BACKEND_DIR" ]; then
     info "Pulling latest..."
@@ -56,18 +38,35 @@ else
     warn "Backend directory not found at $BACKEND_DIR — skipping"
 fi
 
-# ── Restart Services ──
-step_header "Restarting services"
-run sudo systemctl daemon-reload
-run sudo systemctl restart moistello-api moistello-frontend
-ok "Services restarted"
-
-# ── Health Checks ──
-step_header "Health checks"
-info "Backend (port 1100)..."
+# ── Restart backend immediately ──
+run sudo systemctl restart moistello-api
+ok "Backend restarted"
+info "Backend health..."
 wait_for_http "http://127.0.0.1:1100/health" 30
-info "Frontend (port 1110)..."
-wait_for_http "http://127.0.0.1:1110" 30
+
+# ── Frontend (slow) ──
+step_header "Frontend"
+if [ -d "$FRONTEND_DIR" ]; then
+    info "Pulling latest..."
+    cd "$FRONTEND_DIR"
+    run git pull origin master
+
+    info "Installing dependencies..."
+    run npm ci
+
+    info "Building..."
+    run npm run build
+
+    ok "Frontend build complete"
+
+    # ── Restart frontend ──
+    run sudo systemctl restart moistello-frontend
+    ok "Frontend restarted"
+    info "Frontend health..."
+    wait_for_http "http://127.0.0.1:1110" 30
+else
+    warn "Frontend directory not found at $FRONTEND_DIR — skipping"
+fi
 
 echo ""
 ok "Rebuild complete — $DOMAIN is live"
