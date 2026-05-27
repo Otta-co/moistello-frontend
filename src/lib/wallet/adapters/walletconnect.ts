@@ -1,4 +1,6 @@
 import type { WalletAdapter, WalletMeta, NetworkType } from "../types"
+import { getRelayMonitor } from "../wc2-relay"
+import { getWC2SessionStore } from "../wc2-session-store"
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ""
 const RELAY_URL = "wss://relay.walletconnect.com"
@@ -7,6 +9,16 @@ const METADATA = {
   description: "Decentralized savings circles on Stellar",
   url: "https://moistello.io",
   icons: ["https://moistello.io/icon.png"],
+}
+
+let _onPairingUri: ((uri: string) => void) | null = null
+
+export function setOnPairingUri(handler: ((uri: string) => void) | null): void {
+  _onPairingUri = handler
+}
+
+export function getOnPairingUri(): ((uri: string) => void) | null {
+  return _onPairingUri
 }
 
 export function createWalletConnectAdapter(): WalletAdapter {
@@ -114,13 +126,36 @@ export function createWalletConnectAdapter(): WalletAdapter {
     meta,
 
     async connect(): Promise<{ publicKey: string }> {
+      const relay = getRelayMonitor()
+      if (relay.status === "down") {
+        throw {
+          adapter: "walletconnect" as const,
+          code: "internal" as const,
+          message: "WalletConnect relay is unreachable. Try again later or use an extension wallet.",
+          cause: "Relay status: down",
+        }
+      }
+
+      const startTime = performance.now()
       const { SignClient } = await import("@walletconnect/sign-client")
 
-      const signClient = await SignClient.init({
-        projectId: PROJECT_ID || undefined,
-        relayUrl: RELAY_URL,
-        metadata: METADATA,
-      })
+      let signClient: Awaited<ReturnType<typeof SignClient.init>>
+      try {
+        signClient = await SignClient.init({
+          projectId: PROJECT_ID || undefined,
+          relayUrl: RELAY_URL,
+          metadata: METADATA,
+        })
+        relay.recordOutcome(true, performance.now() - startTime)
+      } catch (err) {
+        relay.recordOutcome(false, performance.now() - startTime)
+        throw {
+          adapter: "walletconnect" as const,
+          code: "internal" as const,
+          message: "Failed to initialize WalletConnect. Check your connection.",
+          cause: String(err),
+        }
+      }
 
       return new Promise<{ publicKey: string }>((resolve, reject) => {
         let settled = false
@@ -139,8 +174,55 @@ export function createWalletConnectAdapter(): WalletAdapter {
               },
             },
           })
-          .then(async ({ uri }: { uri?: string }) => {
+          .then(async ({ uri, approval }: { uri?: string; approval?: () => Promise<unknown> }) => {
             if (!uri) return
+
+            if (_onPairingUri) {
+              _onPairingUri(uri)
+              if (approval) {
+                try {
+                  const session = await approval()
+                  const ns = (session as Record<string, unknown>)?.namespaces as Record<string, unknown> | undefined
+                  const stellar = ns?.stellar as Record<string, unknown> | undefined
+                  const accounts = stellar?.accounts as string[] | undefined
+                  if (accounts && accounts.length > 0) {
+                    const account = accounts[0]
+                    const pubKey = account.split(":")[2]
+                    if (pubKey) {
+                      connectedPublicKey = pubKey
+                      connectedNetwork = account.includes("pubnet") ? "mainnet" : "testnet"
+                      setSettled()
+                      getWC2SessionStore().saveSession({
+                        pairingTopic: "",
+                        publicKey: pubKey,
+                        network: connectedNetwork,
+                        createdAt: Date.now(),
+                        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+                      })
+                      resolve({ publicKey: pubKey })
+                      return
+                    }
+                  }
+                  setSettled()
+                  reject({
+                    adapter: "walletconnect" as const,
+                    code: "internal" as const,
+                    message: "Could not extract public key from session",
+                    cause: "No stellar account in namespace",
+                  })
+                } catch {
+                  if (!getSettled()) {
+                    setSettled()
+                    reject({
+                      adapter: "walletconnect" as const,
+                      code: "user_rejected" as const,
+                      message: "You cancelled the connection in your wallet.",
+                    })
+                  }
+                }
+              }
+              return
+            }
 
             if (PROJECT_ID) {
               try {
@@ -174,6 +256,7 @@ export function createWalletConnectAdapter(): WalletAdapter {
           })
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .catch((err: any) => {
+            relay.recordOutcome(false, performance.now() - startTime)
             if (!getSettled()) {
               setSettled()
               reject({
@@ -189,6 +272,7 @@ export function createWalletConnectAdapter(): WalletAdapter {
 
     async disconnect(): Promise<void> {
       connectedPublicKey = null
+      getWC2SessionStore().clear()
     },
 
     async isConnected(): Promise<boolean> {
@@ -207,6 +291,7 @@ export function createWalletConnectAdapter(): WalletAdapter {
     },
 
     async signMessage(message: string): Promise<{ signature: string; publicKey: string }> {
+      const relay = getRelayMonitor()
       if (!connectedPublicKey) {
         throw {
           adapter: "walletconnect" as const,
@@ -214,10 +299,25 @@ export function createWalletConnectAdapter(): WalletAdapter {
           message: "WalletConnect is not connected",
         }
       }
+      if (relay.status === "down") {
+        throw {
+          adapter: "walletconnect" as const,
+          code: "internal" as const,
+          message: "WalletConnect relay is unreachable. Try again later.",
+          cause: "Relay status: down",
+        }
+      }
+      const start = performance.now()
       const encoded = btoa(message)
       const xdr = `AAAAAgAAAAB...${encoded}`
-      const result = await this.signTransaction(xdr)
-      return { signature: result.signedXdr, publicKey: connectedPublicKey }
+      try {
+        const result = await this.signTransaction(xdr)
+        relay.recordOutcome(true, performance.now() - start)
+        return { signature: result.signedXdr, publicKey: connectedPublicKey }
+      } catch (err) {
+        relay.recordOutcome(false, performance.now() - start)
+        throw err
+      }
     },
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -7,7 +7,10 @@ import { Wallet, CheckCircle, ExternalLink, ArrowRight, Loader2, AlertCircle } f
 import { useWalletStore } from "@/stores/wallet-store"
 import { useAuthStore } from "@/stores/auth-store"
 import { useUIStore } from "@/stores/ui-store"
+import { useMultiWalletStore } from "@/stores/multi-wallet-store"
 import { signMessage, isFreighterInstalled } from "@/lib/stellar"
+import { isWalletConnectEnabled } from "@/lib/wallet/features"
+import { WalletSelector } from "@/components/wallet/wallet-selector"
 import apiClient from "@/lib/api-client"
 import { Routes } from "@/lib/constants"
 
@@ -19,6 +22,7 @@ function shortenAddress(address: string): string {
 
 export default function LoginPage() {
   const router = useRouter()
+  const multiWalletEnabled = isWalletConnectEnabled()
 
   const isConnected = useWalletStore((s) => s.isConnected)
   const address = useWalletStore((s) => s.address)
@@ -26,11 +30,22 @@ export default function LoginPage() {
   const walletError = useWalletStore((s) => s.error)
   const connect = useWalletStore((s) => s.connect)
 
+  const mwIsConnected = useMultiWalletStore((s) => s.isConnected)
+  const mwAddress = useMultiWalletStore((s) => s.address)
+  const mwIsConnecting = useMultiWalletStore((s) => s.isConnecting)
+  const mwError = useMultiWalletStore((s) => s.error)
+  const mwSignMessage = useMultiWalletStore((s) => s.signMessage)
+
   const isAuthLoading = useAuthStore((s) => s.isLoading)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const login = useAuthStore((s) => s.login)
 
   const addToast = useUIStore((s) => s.addToast)
+
+  const activeConnected = multiWalletEnabled ? mwIsConnected : isConnected
+  const activeAddress = multiWalletEnabled ? mwAddress : address
+  const activeIsConnecting = multiWalletEnabled ? mwIsConnecting : isConnecting
+  const activeError = multiWalletEnabled ? mwError : walletError
 
   const [step, setStep] = useState<Step>("connect")
   const [isSigning, setIsSigning] = useState(false)
@@ -63,14 +78,14 @@ export default function LoginPage() {
   }
 
   const handleSign = async () => {
-    if (!address) return
+    if (!activeAddress) return
 
     setIsSigning(true)
     setSignError(null)
 
     try {
       const nonceResponse = await apiClient.post("/auth/nonce", {
-        walletAddress: address,
+        walletAddress: activeAddress,
       })
       const nonceData = nonceResponse.data as { nonce: string } | undefined
       const nonce =
@@ -81,9 +96,14 @@ export default function LoginPage() {
         throw new Error("Failed to get authentication nonce")
       }
 
-      const signature = await signMessage(nonce)
+      let signature: string
+      if (multiWalletEnabled) {
+        signature = await mwSignMessage(nonce)
+      } else {
+        signature = await signMessage(nonce)
+      }
 
-      await login(address, signature)
+      await login(activeAddress, signature)
 
       addToast({
         type: "success",
@@ -133,14 +153,14 @@ export default function LoginPage() {
           <div className="flex flex-col items-center gap-1.5">
             <span
               className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                isConnected
+                activeConnected
                   ? "bg-emerald-500 text-white"
                   : step === "connect"
                     ? "gradient-bg text-white shadow-[0_0_16px_rgb(var(--aurora-violet)/0.4)]"
                     : "bg-white/10 text-muted-foreground"
               }`}
             >
-              {isConnected ? <CheckCircle className="h-4 w-4" /> : "1"}
+              {activeConnected ? <CheckCircle className="h-4 w-4" /> : "1"}
             </span>
             <span className="text-2xs text-muted-foreground font-heading">Connect</span>
           </div>
@@ -161,55 +181,61 @@ export default function LoginPage() {
 
         <div className="space-y-6">
           {/* Step 1: Connect Wallet */}
-          {!isConnected ? (
+          {!activeConnected ? (
             <div className="text-center">
-              <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
-                <Wallet className="h-6 w-6" />
-              </div>
-              <h3 className="font-heading text-xl mb-1">Connect Your Wallet</h3>
-              <p className="text-sm text-muted-foreground mb-5">
-                Use Freighter to sign in securely
-              </p>
+              {multiWalletEnabled ? (
+                <WalletSelector variant="overlay" />
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-heading text-xl mb-1">Connect Your Wallet</h3>
+                  <p className="text-sm text-muted-foreground mb-5">
+                    Use Freighter to sign in securely
+                  </p>
 
-              <button
-                onClick={handleConnect}
-                disabled={isConnecting}
-                className="glass-strong w-full h-12 rounded-xl flex items-center justify-center gap-3 text-sm font-heading font-medium text-foreground hover:bg-white/[0.06] transition-all disabled:opacity-50 disabled:pointer-events-none relative overflow-hidden"
-              >
-                {isConnecting ? (
-                  <>
-                    <span className="absolute inset-0 animate-shimmer" />
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <Wallet className="h-5 w-5 text-aurora-violet" />
-                    Connect Freighter
-                  </>
-                )}
-              </button>
-
-              {walletError && (
-                <div className="mt-4 flex items-start gap-2 text-sm text-red-400">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{walletError}</span>
-                </div>
-              )}
-
-              {mounted && !isFreighterInstalled() && (
-                <p className="mt-4 text-center text-sm text-muted-foreground">
-                  Freighter not detected.{" "}
-                  <a
-                    href="https://freighter.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-aurora-cyan hover:underline"
+                  <button
+                    onClick={handleConnect}
+                    disabled={activeIsConnecting}
+                    className="glass-strong w-full h-12 rounded-xl flex items-center justify-center gap-3 text-sm font-heading font-medium text-foreground hover:bg-white/[0.06] transition-all disabled:opacity-50 disabled:pointer-events-none relative overflow-hidden"
                   >
-                    Install Freighter
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </p>
+                    {activeIsConnecting ? (
+                      <>
+                        <span className="absolute inset-0 animate-shimmer" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="h-5 w-5 text-aurora-violet" />
+                        Connect Freighter
+                      </>
+                    )}
+                  </button>
+
+                  {activeError && (
+                    <div className="mt-4 flex items-start gap-2 text-sm text-red-400">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{activeError}</span>
+                    </div>
+                  )}
+
+                  {mounted && !isFreighterInstalled() && (
+                    <p className="mt-4 text-center text-sm text-muted-foreground">
+                      Freighter not detected.{" "}
+                      <a
+                        href="https://freighter.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-aurora-cyan hover:underline"
+                      >
+                        Install Freighter
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -223,7 +249,7 @@ export default function LoginPage() {
                   Connected &#x2713;
                 </p>
                 <p className="text-xs text-muted-foreground font-mono truncate">
-                  {address ? shortenAddress(address) : ""}
+                  {activeAddress ? shortenAddress(activeAddress) : ""}
                 </p>
               </div>
             </div>
@@ -233,7 +259,7 @@ export default function LoginPage() {
           <div>
             <button
               onClick={handleSign}
-              disabled={!isConnected || step !== "sign" || isSigning || isAuthLoading}
+              disabled={!activeConnected || step !== "sign" || isSigning || isAuthLoading}
               className="gradient-bg-extended w-full h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none shadow-[0_0_24px_rgb(var(--aurora-violet)/0.25)]"
             >
               {isSigning || isAuthLoading ? (

@@ -8,6 +8,8 @@ import dynamic from "next/dynamic"
 import type { WalletId } from "@/lib/wallet/types"
 
 const LedgerPrompt = dynamic(() => import("@/components/wallet/ledger-prompt").then((m) => m.LedgerPrompt), { ssr: false })
+const WalletConnectQR = dynamic(() => import("@/components/wallet/walletconnect-qr").then((m) => m.WalletConnectQR), { ssr: false })
+const WalletConnectDeepLink = dynamic(() => import("@/components/wallet/walletconnect-deeplink").then((m) => m.WalletConnectDeepLink), { ssr: false })
 
 const walletIcons: Record<string, string> = {
   walletconnect: "WC",
@@ -188,6 +190,15 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
   const disconnect = useMultiWalletStore((s) => s.disconnect)
 
   const isWebUSBAvailable = typeof navigator !== "undefined" && "usb" in navigator
+  const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+  const wc2PairingUri = useMultiWalletStore((s) => s.wc2PairingUri)
+  const wc2PairingState = useMultiWalletStore((s) => s.wc2PairingState)
+  const wc2PairingError = useMultiWalletStore((s) => s.wc2PairingError)
+  const setWc2PairingUri = useMultiWalletStore((s) => s.setWc2PairingUri)
+  const setWc2PairingError = useMultiWalletStore((s) => s.setWc2PairingError)
+  const resetWc2Pairing = useMultiWalletStore((s) => s.resetWc2Pairing)
+  const setWc2PairingState = useMultiWalletStore((s) => s.setWc2PairingState)
 
   const sortedWallets = [...detectedWallets].sort((a, b) => {
     if (a.id === "walletconnect") return -1
@@ -197,6 +208,7 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
 
   const hardwareWallets = sortedWallets.filter((w) => w.category === "hardware")
   const standardWallets = sortedWallets.filter((w) => w.category !== "hardware")
+  const isWc2Active = wc2PairingState !== "idle" && wc2PairingState !== "approved"
 
   const handleSelect = async (walletId: WalletId) => {
     const wallet = detectedWallets.find((w) => w.id === walletId)
@@ -204,16 +216,49 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
       setShowLedgerPrompt(true)
       return
     }
+
+    if (walletId === "walletconnect") {
+      // Must dynamically import to avoid circular dep during SSR
+      const { setOnPairingUri } = await import("@/lib/wallet/adapters/walletconnect")
+      setOnPairingUri((uri: string) => {
+        setWc2PairingUri(uri)
+        setWc2PairingState("awaiting_approval")
+      })
+    }
+
     try {
       await connect(walletId)
+      if (walletId === "walletconnect") {
+        setWc2PairingState("approved")
+      }
     } catch {
-      // error already stored
+      if (walletId === "walletconnect") {
+        setWc2PairingError(address || "Connection failed or was cancelled.")
+      }
+    } finally {
+      if (walletId === "walletconnect") {
+        const { setOnPairingUri } = await import("@/lib/wallet/adapters/walletconnect")
+        setOnPairingUri(null)
+      }
+    }
+  }
+
+  const handleWc2Retry = () => {
+    resetWc2Pairing()
+    handleSelect("walletconnect")
+  }
+
+  const handleWc2Cancel = () => {
+    resetWc2Pairing()
+    if (activeWalletId === "walletconnect") {
+      disconnect("walletconnect")
     }
   }
 
   const handleDisconnect = () => {
     if (activeWalletId) {
       disconnect(activeWalletId)
+      resetWc2Pairing()
     }
   }
 
@@ -221,7 +266,36 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
     return (
       <>
       <div className={cn("space-y-4", className)}>
-        {!isConnected ? (
+        {isWc2Active && !isConnected ? (
+          <>
+            <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
+              <QrCode className="h-6 w-6" />
+            </div>
+            <h3 className="font-heading text-xl text-center mb-1">Connect with WalletConnect</h3>
+            <p className="text-sm text-muted-foreground text-center mb-5">
+              {isMobileBrowser
+                ? "Open your wallet app to connect"
+                : "Scan the QR code with your mobile wallet"}
+            </p>
+
+            {isMobileBrowser ? (
+              <WalletConnectDeepLink
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+              />
+            ) : (
+              <WalletConnectQR
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+                onCancel={handleWc2Cancel}
+              />
+            )}
+          </>
+        ) : !isConnected ? (
           <>
             <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
               <Wallet className="h-6 w-6" />
@@ -306,7 +380,40 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
     return (
       <>
       <div className={cn("space-y-3", className)}>
-        {isSelectorOpen ? (
+        {isWc2Active ? (
+          <div className="glass-flagship rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-aurora-violet" />
+              <p className="text-sm font-medium text-foreground">
+                Connect with WalletConnect
+              </p>
+              <button
+                type="button"
+                onClick={handleWc2Cancel}
+                className="ml-auto p-1 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-red-400 transition-colors"
+                aria-label="Cancel WalletConnect pairing"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {isMobileBrowser ? (
+              <WalletConnectDeepLink
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+              />
+            ) : (
+              <WalletConnectQR
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+                onCancel={handleWc2Cancel}
+              />
+            )}
+          </div>
+        ) : isSelectorOpen ? (
           <div className="space-y-2">
             {standardWallets.map((w) => (
               <WalletItem

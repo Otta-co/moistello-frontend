@@ -43,6 +43,13 @@ interface MultiWalletState {
   activeAdapter: WalletAdapter | null;
   isSelectorOpen: boolean;
 
+  /* WC2-specific state */
+  wc2PairingUri: string | null;
+  wc2PairingState: "idle" | "pairing" | "awaiting_approval" | "approved" | "rejected" | "timeout" | "error";
+  wc2RelayStatus: "healthy" | "degraded" | "down";
+  wc2PairingError: string | null;
+  wc2QrExpiresAt: number | null;
+
   /* Actions */
   scanWallets: () => void;
   connect: (walletId: WalletId) => Promise<void>;
@@ -54,6 +61,12 @@ interface MultiWalletState {
   updateWalletStatus: (walletId: WalletId, status: WalletEntry["status"]) => void;
   signMessage: (message: string) => Promise<string>;
   setSelectorOpen: (open: boolean) => void;
+  /* WC2 actions */
+  setWc2PairingUri: (uri: string | null) => void;
+  setWc2PairingState: (state: MultiWalletState["wc2PairingState"]) => void;
+  setWc2PairingError: (error: string | null) => void;
+  setWc2RelayStatus: (status: MultiWalletState["wc2RelayStatus"]) => void;
+  resetWc2Pairing: () => void;
 }
 
 /* Helper: sync convenience fields from wallet record */
@@ -88,6 +101,13 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
   error: null,
   activeAdapter: null,
   isSelectorOpen: false,
+
+  /* WC2 defaults */
+  wc2PairingUri: null,
+  wc2PairingState: "idle",
+  wc2RelayStatus: "healthy",
+  wc2PairingError: null,
+  wc2QrExpiresAt: null,
 
   init: async () => {
     const sessionManager = getSessionManager();
@@ -372,5 +392,38 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
 
   setSelectorOpen: (open: boolean) => {
     set({ isSelectorOpen: open });
+  },
+
+  /* WC2 actions */
+  setWc2PairingUri: (uri: string | null) => {
+    set({
+      wc2PairingUri: uri,
+      wc2PairingState: uri ? "pairing" : "idle",
+      wc2QrExpiresAt: uri ? Date.now() + 120_000 : null,
+    });
+  },
+
+  setWc2PairingState: (state) => {
+    set({ wc2PairingState: state });
+  },
+
+  setWc2PairingError: (error) => {
+    set({
+      wc2PairingError: error,
+      wc2PairingState: error ? "error" : get().wc2PairingState,
+    });
+  },
+
+  setWc2RelayStatus: (status) => {
+    set({ wc2RelayStatus: status });
+  },
+
+  resetWc2Pairing: () => {
+    set({
+      wc2PairingUri: null,
+      wc2PairingState: "idle",
+      wc2PairingError: null,
+      wc2QrExpiresAt: null,
+    });
   },
 }));
