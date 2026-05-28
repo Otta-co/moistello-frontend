@@ -1,20 +1,46 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Wallet, CheckCircle, ExternalLink, ArrowRight, Loader2, AlertCircle, Fingerprint } from "lucide-react"
-import { useWalletStore } from "@/stores/wallet-store"
+import {
+  Fingerprint,
+  Wallet,
+  QrCode,
+  Usb,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  Shield,
+} from "lucide-react"
+import dynamic from "next/dynamic"
+import { useMultiWalletStore } from "@/stores/multi-wallet-store"
 import { useAuthStore } from "@/stores/auth-store"
 import { useUIStore } from "@/stores/ui-store"
-import { useMultiWalletStore } from "@/stores/multi-wallet-store"
-import { signMessage, isFreighterInstalled } from "@/lib/stellar"
-import { isWalletConnectEnabled, isPasskeyEnabled } from "@/lib/wallet/features"
-import { WalletSelector } from "@/components/wallet/wallet-selector"
 import apiClient from "@/lib/api-client"
 import { Routes } from "@/lib/constants"
+import { cn } from "@/lib/cn"
 
-type Step = "connect" | "sign"
+const LedgerPrompt = dynamic(
+  () => import("@/components/wallet/ledger-prompt").then((m) => m.LedgerPrompt),
+  { ssr: false },
+)
+
+const WalletConnectQR = dynamic(
+  () =>
+    import("@/components/wallet/walletconnect-qr").then((m) => m.WalletConnectQR),
+  { ssr: false },
+)
+
+const WalletConnectDeepLink = dynamic(
+  () =>
+    import("@/components/wallet/walletconnect-deeplink").then(
+      (m) => m.WalletConnectDeepLink,
+    ),
+  { ssr: false },
+)
+
+type Step = "choose" | "sign"
 
 function shortenAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -22,45 +48,39 @@ function shortenAddress(address: string): string {
 
 export default function LoginPage() {
   const router = useRouter()
-  const walletConnectEnabled = isWalletConnectEnabled()
-  const passkeyEnabled = isPasskeyEnabled()
-  const multiWalletEnabled = walletConnectEnabled || passkeyEnabled
 
-  const isConnected = useWalletStore((s) => s.isConnected)
-  const address = useWalletStore((s) => s.address)
-  const isConnecting = useWalletStore((s) => s.isConnecting)
-  const walletError = useWalletStore((s) => s.error)
-  const connect = useWalletStore((s) => s.connect)
-
-  const mwIsConnected = useMultiWalletStore((s) => s.isConnected)
-  const mwAddress = useMultiWalletStore((s) => s.address)
-  const mwIsConnecting = useMultiWalletStore((s) => s.isConnecting)
-  const mwError = useMultiWalletStore((s) => s.error)
-  const mwSignMessage = useMultiWalletStore((s) => s.signMessage)
-  const mwConnect = useMultiWalletStore((s) => s.connect)
+  const connect = useMultiWalletStore((s) => s.connect)
+  const isConnecting = useMultiWalletStore((s) => s.isConnecting)
+  const error = useMultiWalletStore((s) => s.error)
+  const address = useMultiWalletStore((s) => s.address)
+  const isConnected = useMultiWalletStore((s) => s.isConnected)
+  const activeAdapter = useMultiWalletStore((s) => s.activeAdapter)
+  const detectedWallets = useMultiWalletStore((s) => s.detectedWallets)
+  const wc2PairingState = useMultiWalletStore((s) => s.wc2PairingState)
+  const wc2PairingUri = useMultiWalletStore((s) => s.wc2PairingUri)
+  const wc2PairingError = useMultiWalletStore((s) => s.wc2PairingError)
+  const passkeyState = useMultiWalletStore((s) => s.passkeyState)
   const setPasskeyEmail = useMultiWalletStore((s) => s.setPasskeyEmail)
   const setPasskeyState = useMultiWalletStore((s) => s.setPasskeyState)
+  const setPasskeyPublicKey = useMultiWalletStore((s) => s.setPasskeyPublicKey)
+  const setWc2PairingUri = useMultiWalletStore((s) => s.setWc2PairingUri)
+  const setWc2PairingState = useMultiWalletStore((s) => s.setWc2PairingState)
+  const setWc2PairingError = useMultiWalletStore((s) => s.setWc2PairingError)
+  const resetWc2Pairing = useMultiWalletStore((s) => s.resetWc2Pairing)
 
-  const isAuthLoading = useAuthStore((s) => s.isLoading)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const login = useAuthStore((s) => s.login)
 
   const addToast = useUIStore((s) => s.addToast)
 
-  const activeConnected = multiWalletEnabled ? mwIsConnected : isConnected
-  const activeAddress = multiWalletEnabled ? mwAddress : address
-  const activeIsConnecting = multiWalletEnabled ? mwIsConnecting : isConnecting
-  const activeError = multiWalletEnabled ? mwError : walletError
-
-  const [step, setStep] = useState<Step>("connect")
+  const [step, setStep] = useState<Step>("choose")
+  const [passkeyEmail, setLocalPasskeyEmail] = useState("")
   const [isSigning, setIsSigning] = useState(false)
   const [signError, setSignError] = useState<string | null>(null)
-  const [passkeyEmail, setLocalPasskeyEmail] = useState("")
-  const [mounted, setMounted] = useState(false)
+  const [showLedgerPrompt, setShowLedgerPrompt] = useState(false)
+  const [isWc2Active, setIsWc2Active] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const signInitiated = useRef(false)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -68,49 +88,23 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router])
 
-  const handleConnect = async () => {
-    try {
-      await connect()
+  useEffect(() => {
+    if (isConnected && address && step === "choose" && !signInitiated.current) {
+      signInitiated.current = true
       setStep("sign")
-      setSignError(null)
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Connection Failed",
-        description:
-          err instanceof Error ? err.message : "Failed to connect wallet",
-      })
+      performLogin(address)
     }
-  }
+    // performLogin is a stable module-level function — not a hook dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address, step])
 
-  const handlePasskeyConnect = async () => {
-    if (!passkeyEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passkeyEmail)) return
-
-    setPasskeyEmail(passkeyEmail)
-    setPasskeyState("registering")
-    try {
-      await mwConnect("passkey")
-      setStep("sign")
-      setSignError(null)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Passkey connection failed"
-      addToast({
-        type: "error",
-        title: "Passkey Failed",
-        description: message,
-      })
-    }
-  }
-
-  const handleSign = async () => {
-    if (!activeAddress) return
-
+  async function performLogin(walletAddress: string) {
     setIsSigning(true)
     setSignError(null)
 
     try {
       const nonceResponse = await apiClient.post("/auth/nonce", {
-        walletAddress: activeAddress,
+        walletAddress,
       })
       const nonceData = nonceResponse.data as { nonce: string } | undefined
       const nonce =
@@ -121,14 +115,9 @@ export default function LoginPage() {
         throw new Error("Failed to get authentication nonce")
       }
 
-      let signature: string
-      if (multiWalletEnabled) {
-        signature = await mwSignMessage(nonce)
-      } else {
-        signature = await signMessage(nonce)
-      }
-
-      await login(activeAddress, signature)
+      const store = useMultiWalletStore.getState()
+      const signature = await store.signMessage(nonce)
+      await login(walletAddress, signature)
 
       addToast({
         type: "success",
@@ -137,7 +126,7 @@ export default function LoginPage() {
       })
 
       router.push(Routes.DASHBOARD)
-    } catch (err) {
+    } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Authentication failed"
       setSignError(message)
@@ -151,20 +140,148 @@ export default function LoginPage() {
     }
   }
 
+  const handleSelectWallet = useCallback(
+    async (walletId: string) => {
+      if (walletId === "passkey") {
+        setStep("choose")
+        return
+      }
+
+      const wallet = detectedWallets.find((w) => w.id === walletId)
+      if (wallet?.category === "hardware") {
+        setShowLedgerPrompt(true)
+        return
+      }
+
+      if (walletId === "walletconnect") {
+        setIsWc2Active(true)
+        try {
+          const { setOnPairingUri } = await import(
+            "@/lib/wallet/adapters/walletconnect"
+          )
+          setOnPairingUri((uri: string) => {
+            setWc2PairingUri(uri)
+            setWc2PairingState("awaiting_approval")
+          })
+          await connect("walletconnect")
+          setWc2PairingState("approved")
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : "Connection failed"
+          setWc2PairingError(message)
+          addToast({
+            type: "error",
+            title: "WalletConnect Failed",
+            description: message,
+          })
+          return
+        } finally {
+          const { setOnPairingUri } = await import(
+            "@/lib/wallet/adapters/walletconnect"
+          )
+          setOnPairingUri(null)
+        }
+        setIsWc2Active(false)
+        return
+      }
+
+      try {
+        await connect(walletId)
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Connection failed"
+        addToast({
+          type: "error",
+          title: "Connection Failed",
+          description: message,
+        })
+      }
+    },
+    [detectedWallets, connect, setWc2PairingUri, setWc2PairingState, setWc2PairingError, addToast],
+  )
+
+  const handleWc2Cancel = useCallback(() => {
+    resetWc2Pairing()
+    setIsWc2Active(false)
+  }, [resetWc2Pairing])
+
+  const handleWc2Retry = () => {
+    handleSelectWallet("walletconnect")
+  }
+
+  const handlePasskeyConnect = useCallback(async () => {
+    if (
+      !passkeyEmail ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passkeyEmail)
+    ) {
+      setSignError("Please enter a valid email address")
+      return
+    }
+    setSignError(null)
+    setPasskeyEmail(passkeyEmail)
+    setPasskeyState("registering")
+
+    try {
+      await connect("passkey")
+      const mwAddress = useMultiWalletStore.getState().address
+      if (!mwAddress) {
+        throw new Error("Failed to get wallet address")
+      }
+      setPasskeyPublicKey(mwAddress)
+      setPasskeyState("connected")
+      await performLogin(mwAddress)
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Passkey login failed"
+      setPasskeyState("error")
+      setSignError(message)
+      addToast({
+        type: "error",
+        title: "Passkey Login Failed",
+        description: message,
+      })
+    }
+  // performLogin is a stable module-level function — not a hook dependency
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyEmail, connect, setPasskeyEmail, setPasskeyState, setPasskeyPublicKey, addToast])
+
   if (isAuthenticated) {
     return (
       <div className="min-h-screen auroral-mesh flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-aurora-violet" />
-          <p className="text-muted-foreground text-sm">Redirecting to dashboard...</p>
+          <p className="text-muted-foreground text-sm">
+            Redirecting to dashboard...
+          </p>
         </div>
       </div>
     )
   }
 
+  const extensionWallets = detectedWallets.filter(
+    (w) => w.category === "extension",
+  )
+  const hasWalletConnect = detectedWallets.some((w) => w.id === "walletconnect")
+  const hasLedger = detectedWallets.some((w) => w.id === "ledger")
+  const hasPasskey = detectedWallets.some((w) => w.id === "passkey")
+
+  const walletCardIcon = (id: string, name: string) => {
+    switch (id) {
+      case "walletconnect":
+        return <QrCode className="h-7 w-7" />
+      case "ledger":
+        return <Usb className="h-7 w-7" />
+      default:
+        return (
+          <span className="text-lg font-bold">
+            {name.charAt(0).toUpperCase()}
+          </span>
+        )
+    }
+  }
+
   return (
     <div className="min-h-screen auroral-mesh flex flex-col items-center justify-center px-4 py-12">
-      {/* Card */}
       <div className="glass-flagship rounded-3xl p-8 md:p-10 max-w-md w-full mx-auto holo-border relative z-10">
         <Link
           href={Routes.HOME}
@@ -173,189 +290,256 @@ export default function LoginPage() {
           Moistello
         </Link>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-0 mb-8">
-          <div className="flex flex-col items-center gap-1.5">
-            <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                activeConnected
-                  ? "bg-emerald-500 text-white"
-                  : step === "connect"
-                    ? "gradient-bg text-white shadow-[0_0_16px_rgb(var(--aurora-violet)/0.4)]"
-                    : "bg-white/10 text-muted-foreground"
-              }`}
-            >
-              {activeConnected ? <CheckCircle className="h-4 w-4" /> : "1"}
-            </span>
-            <span className="text-2xs text-muted-foreground font-heading">Connect</span>
-          </div>
-          <div className="w-12 h-px bg-gradient-to-r from-aurora-violet/50 to-aurora-cyan/30 mx-2" />
-          <div className="flex flex-col items-center gap-1.5">
-            <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                step === "sign"
-                  ? "gradient-bg text-white shadow-[0_0_16px_rgb(var(--aurora-violet)/0.4)]"
-                  : "bg-white/10 text-muted-foreground"
-              }`}
-            >
-              2
-            </span>
-            <span className="text-2xs text-muted-foreground font-heading">Verify</span>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* Step 1: Connect Wallet */}
-          {!activeConnected ? (
-            <div className="text-center">
-              {multiWalletEnabled ? (
-                <div className="space-y-4">
-                  {walletConnectEnabled && <WalletSelector variant="overlay" />}
-                  {walletConnectEnabled && passkeyEnabled && (
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-white/10" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">or</span>
-                      </div>
-                    </div>
-                  )}
-                  {passkeyEnabled && (
-                    <div className="glass rounded-2xl p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl gradient-bg-extended flex items-center justify-center text-white shrink-0">
-                        <Fingerprint className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground">Passkey / Email</p>
-                        <p className="text-xs text-muted-foreground">No wallet needed</p>
-                      </div>
-                    </div>
-                    <input
-                      type="email"
-                      value={passkeyEmail}
-                      onChange={(e) => setLocalPasskeyEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full h-10 glass rounded-xl px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-aurora-violet/50 mb-2"
-                      autoComplete="email"
-                    />
-                    <button
-                      onClick={handlePasskeyConnect}
-                      disabled={mwIsConnecting || !passkeyEmail}
-                      className="gradient-bg-extended w-full h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
-                    >
-                      {mwIsConnecting ? (
-                        <><Loader2 className="h-3 w-3 animate-spin" /> Connecting...</>
-                      ) : (
-                        <><Fingerprint className="h-3 w-3" /> Sign in with Passkey</>
-                      )}
-                    </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
-                    <Wallet className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-heading text-xl mb-1">Connect Your Wallet</h3>
-                  <p className="text-sm text-muted-foreground mb-5">
-                    Use Freighter to sign in securely
-                  </p>
-
-                  <button
-                    onClick={handleConnect}
-                    disabled={activeIsConnecting}
-                    className="glass-strong w-full h-12 rounded-xl flex items-center justify-center gap-3 text-sm font-heading font-medium text-foreground hover:bg-white/[0.06] transition-all disabled:opacity-50 disabled:pointer-events-none relative overflow-hidden"
-                  >
-                    {activeIsConnecting ? (
-                      <>
-                        <span className="absolute inset-0 animate-shimmer" />
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Wallet className="h-5 w-5 text-aurora-violet" />
-                        Connect Freighter
-                      </>
-                    )}
-                  </button>
-
-                  {activeError && (
-                    <div className="mt-4 flex items-start gap-2 text-sm text-red-400">
-                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>{activeError}</span>
-                    </div>
-                  )}
-
-                  {mounted && !isFreighterInstalled() && (
-                    <p className="mt-4 text-center text-sm text-muted-foreground">
-                      Freighter not detected.{" "}
-                      <a
-                        href="https://freighter.app"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-aurora-cyan hover:underline"
-                      >
-                        Install Freighter
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </p>
-                  )}
-                </>
-              )}
+        {isSigning ? (
+          <div className="text-center space-y-5 py-8">
+            <Loader2 className="h-10 w-10 animate-spin mx-auto text-aurora-violet" />
+            <div>
+              <h3 className="font-heading text-lg mb-1">Signing you in...</h3>
+              <p className="text-sm text-muted-foreground">
+                {passkeyState === "authenticating"
+                  ? "Verifying biometric..."
+                  : "Waiting for wallet confirmation..."}
+              </p>
             </div>
-          ) : (
-            <div className="glass rounded-2xl px-4 py-3.5 flex items-center gap-3">
-              <span className="relative flex h-3 w-3 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  Connected &#x2713;
-                </p>
-                <p className="text-xs text-muted-foreground font-mono truncate">
-                  {activeAddress ? shortenAddress(activeAddress) : ""}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Sign to Verify */}
-          <div>
-            <button
-              onClick={handleSign}
-              disabled={!activeConnected || step !== "sign" || isSigning || isAuthLoading}
-              className="gradient-bg-extended w-full h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none shadow-[0_0_24px_rgb(var(--aurora-violet)/0.25)]"
-            >
-              {isSigning || isAuthLoading ? (
-                <>
-                  <span className="absolute inset-0 animate-shimmer rounded-xl" />
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing...
-                </>
-              ) : (
-                <>
-                  Sign to Verify
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              This proves you own this wallet without revealing your private key.
-            </p>
-
             {signError && (
-              <div className="mt-3 flex items-start gap-2 text-sm text-red-400">
+              <div className="flex items-start gap-2 text-sm text-red-400 text-left">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>{signError}</span>
               </div>
             )}
+            {address && (
+              <div className="glass rounded-xl px-4 py-3 flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {activeAdapter?.meta.name ?? "Wallet"}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">
+                    {shortenAddress(address)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        ) : step === "choose" && isWc2Active ? (
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
+              <QrCode className="h-6 w-6" />
+            </div>
+            <h3 className="font-heading text-xl mb-1">
+              Connect with WalletConnect
+            </h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              {/Android|iPhone|iPad|iPod/i.test(
+                typeof navigator !== "undefined" ? navigator.userAgent : "",
+              )
+                ? "Open your wallet app to connect"
+                : "Scan the QR code with your mobile wallet"}
+            </p>
+
+            {/Android|iPhone|iPad|iPod/i.test(
+              typeof navigator !== "undefined" ? navigator.userAgent : "",
+            ) ? (
+              <WalletConnectDeepLink
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+              />
+            ) : (
+              <WalletConnectQR
+                uri={wc2PairingUri}
+                pairingState={wc2PairingState}
+                error={wc2PairingError}
+                onRetry={handleWc2Retry}
+                onCancel={handleWc2Cancel}
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={handleWc2Cancel}
+              className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* ───── Passkey Quick Entry ───── */}
+            {hasPasskey && (
+              <div className="glass rounded-2xl p-5 border border-aurora-violet/20">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl gradient-bg-extended flex items-center justify-center text-white shrink-0">
+                    <Fingerprint className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Sign in with biometrics
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Use your passkey to sign in instantly
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="email"
+                  value={passkeyEmail}
+                  onChange={(e) => {
+                    setLocalPasskeyEmail(e.target.value)
+                    setSignError(null)
+                  }}
+                  placeholder="your@email.com"
+                  className="w-full h-11 glass rounded-xl px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-aurora-violet/50 mb-2"
+                  autoComplete="email"
+                />
+                <button
+                  onClick={handlePasskeyConnect}
+                  disabled={
+                    isConnecting ||
+                    !passkeyEmail ||
+                    passkeyState === "registering" ||
+                    passkeyState === "awaiting_biometric" ||
+                    passkeyState === "authenticating"
+                  }
+                  className="gradient-bg-extended w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isConnecting ||
+                  passkeyState === "registering" ||
+                  passkeyState === "awaiting_biometric" ||
+                  passkeyState === "authenticating" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {passkeyState === "registering"
+                        ? "Connecting..."
+                        : passkeyState === "awaiting_biometric"
+                          ? "Scan biometric..."
+                          : "Verifying..."}
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-4 w-4" />
+                      Sign in with Passkey
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* ───── Divider ───── */}
+            {hasPasskey && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    or connect a wallet
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ───── Wallet Grid ───── */}
+            {!hasPasskey && (
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <h3 className="font-heading text-xl mb-1">Welcome back</h3>
+                <p className="text-sm text-muted-foreground mb-5">
+                  Choose how to sign in
+                </p>
+              </div>
+            )}
+
+            {hasPasskey && (
+              <p className="text-xs text-muted-foreground text-center">
+                Or use a wallet to sign in
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {extensionWallets.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => handleSelectWallet(w.id)}
+                  disabled={w.status !== "detected" || isConnecting}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 glass rounded-2xl p-4 min-h-[100px] transition-all hover:bg-white/[0.06] hover:border-aurora-violet/40 border border-white/10",
+                    w.status !== "detected" && "opacity-40 pointer-events-none",
+                  )}
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-aurora-cyan">
+                    {walletCardIcon(w.id, w.name)}
+                  </span>
+                  <span className="text-xs font-heading font-medium text-center leading-tight">
+                    {w.name}
+                  </span>
+                  {w.status !== "detected" && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Not installed
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              {hasWalletConnect && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectWallet("walletconnect")}
+                  disabled={isConnecting}
+                  className="flex flex-col items-center justify-center gap-2 glass rounded-2xl p-4 min-h-[100px] transition-all hover:bg-white/[0.06] holo-border disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-aurora-violet/20 text-aurora-violet">
+                    <QrCode className="h-5 w-5" />
+                  </span>
+                  <span className="text-xs font-heading font-medium text-center leading-tight">
+                    WalletConnect
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Mobile wallets
+                  </span>
+                </button>
+              )}
+
+              {hasLedger && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectWallet("ledger")}
+                  disabled={isConnecting}
+                  className="flex flex-col items-center justify-center gap-2 glass rounded-2xl p-4 min-h-[100px] transition-all hover:bg-white/[0.06] hover:border-premium-gold/40 border border-white/10 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-premium-gold/20 text-premium-gold">
+                    <Usb className="h-5 w-5" />
+                  </span>
+                  <span className="text-xs font-heading font-medium text-center leading-tight">
+                    Ledger
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Hardware wallet
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 text-sm text-red-400">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {extensionWallets.filter((w) => w.status === "detected")
+              .length === 0 && !hasPasskey && !hasWalletConnect && !hasLedger && (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No wallets available. Install a Stellar wallet like Freighter or
+                use WalletConnect.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-8 pt-6 border-t border-border flex flex-col gap-2 items-center">
           <p className="text-sm text-muted-foreground">
@@ -375,6 +559,11 @@ export default function LoginPage() {
           </Link>
         </div>
       </div>
+
+      <LedgerPrompt
+        isOpen={showLedgerPrompt}
+        onClose={() => setShowLedgerPrompt(false)}
+      />
     </div>
   )
 }
