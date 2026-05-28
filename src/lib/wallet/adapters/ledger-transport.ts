@@ -200,7 +200,9 @@ export class LedgerTransportManager {
 
     if (this.transportType === "webusb") {
       try {
-        ;(navigator.usb as Record<string, unknown>).addEventListener?.("disconnect", (event: Event) => {
+        const nav = navigator as unknown as { usb?: { addEventListener?: (event: string, handler: (e: Event) => void) => void } }
+        const usb = nav.usb
+        usb?.addEventListener?.("disconnect", (event: Event) => {
           const e = event as CustomEvent<{ device: { serialNumber?: string } }>
           if (e.detail?.device && e.detail.device.serialNumber === this.deviceSerial) {
             this.handleDisconnect("usb_unplugged")
@@ -241,9 +243,9 @@ export class LedgerTransportManager {
   private async pingDevice(): Promise<boolean> {
     if (!this.transportInstance) return false
     try {
-      const transport = this.transportInstance as { sendCustom?: () => Promise<unknown> }
-      if (typeof transport.sendCustom === "function") {
-        await transport.sendCustom(
+      const sendCustom = (this.transportInstance as { sendCustom?: (...args: unknown[]) => Promise<unknown> }).sendCustom
+      if (typeof sendCustom === "function") {
+        await sendCustom(
           new Uint8Array([0xE0, 0x01, 0x00, 0x00, 0x00])
         )
       }

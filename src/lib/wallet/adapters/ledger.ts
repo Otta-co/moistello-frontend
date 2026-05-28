@@ -89,8 +89,8 @@ export function createLedgerAdapter(
   async function ensureStellarApp(): Promise<typeof stellarApp> {
     if (stellarApp && manager.getTransport()) return stellarApp
     const { transport } = await manager.detectAndCreateTransport()
-    const Str = (await import("@ledgerhq/hw-app-str")).default
-    stellarApp = new Str(transport) as typeof stellarApp
+    const { default: Str } = await import("@ledgerhq/hw-app-str")
+    stellarApp = new (Str as unknown as new (transport: unknown) => typeof stellarApp)(transport)
     return stellarApp
   }
 
@@ -262,7 +262,7 @@ export function createLedgerAdapter(
         const nwPassphrase = networkPassphrase(network)
         const tx = new Transaction(xdr, nwPassphrase)
         const signatureBytes = hexToBytes(result.signature)
-        const sigBase64 = btoa(String.fromCharCode(...signatureBytes))
+        const sigBase64 = btoa(String.fromCharCode(...Array.from(signatureBytes)))
         tx.addSignature(pk, sigBase64)
         const signedXdr = tx.toEnvelope().toXDR("base64")
         return { signedXdr }
@@ -292,5 +292,5 @@ export function createLedgerAdapter(
         return false
       }
     },
-  }
+  } as WalletAdapter
 }
