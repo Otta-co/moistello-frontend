@@ -131,6 +131,10 @@ export default function RegisterPage() {
   const [nonce, setNonce] = useState<string | null>(null)
 
   useEffect(() => {
+    useMultiWalletStore.getState().scanWallets()
+  }, [])
+
+  useEffect(() => {
     if (isAuthenticated) {
       router.push(Routes.DASHBOARD)
     }

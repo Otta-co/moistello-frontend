@@ -60,7 +60,6 @@ export default function LoginPage() {
   const wc2PairingUri = useMultiWalletStore((s) => s.wc2PairingUri)
   const wc2PairingError = useMultiWalletStore((s) => s.wc2PairingError)
   const passkeyState = useMultiWalletStore((s) => s.passkeyState)
-  const setPasskeyEmail = useMultiWalletStore((s) => s.setPasskeyEmail)
   const setPasskeyState = useMultiWalletStore((s) => s.setPasskeyState)
   const setPasskeyPublicKey = useMultiWalletStore((s) => s.setPasskeyPublicKey)
   const setWc2PairingUri = useMultiWalletStore((s) => s.setWc2PairingUri)
@@ -74,13 +73,16 @@ export default function LoginPage() {
   const addToast = useUIStore((s) => s.addToast)
 
   const [step, setStep] = useState<Step>("choose")
-  const [passkeyEmail, setLocalPasskeyEmail] = useState("")
   const [isSigning, setIsSigning] = useState(false)
   const [signError, setSignError] = useState<string | null>(null)
   const [showLedgerPrompt, setShowLedgerPrompt] = useState(false)
   const [isWc2Active, setIsWc2Active] = useState(false)
 
   const signInitiated = useRef(false)
+
+  useEffect(() => {
+    useMultiWalletStore.getState().scanWallets()
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -143,7 +145,6 @@ export default function LoginPage() {
   const handleSelectWallet = useCallback(
     async (walletId: string) => {
       if (walletId === "passkey") {
-        setStep("choose")
         return
       }
 
@@ -210,17 +211,8 @@ export default function LoginPage() {
   }
 
   const handlePasskeyConnect = useCallback(async () => {
-    if (
-      !passkeyEmail ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passkeyEmail)
-    ) {
-      setSignError("Please enter a valid email address")
-      return
-    }
     setSignError(null)
-    setPasskeyEmail(passkeyEmail)
     setPasskeyState("registering")
-
     try {
       await connect("passkey")
       const mwAddress = useMultiWalletStore.getState().address
@@ -229,7 +221,6 @@ export default function LoginPage() {
       }
       setPasskeyPublicKey(mwAddress)
       setPasskeyState("connected")
-      await performLogin(mwAddress)
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Passkey login failed"
@@ -241,9 +232,7 @@ export default function LoginPage() {
         description: message,
       })
     }
-  // performLogin is a stable module-level function — not a hook dependency
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passkeyEmail, connect, setPasskeyEmail, setPasskeyState, setPasskeyPublicKey, addToast])
+  }, [connect, setPasskeyState, setPasskeyPublicKey, addToast])
 
   if (isAuthenticated) {
     return (
@@ -382,27 +371,15 @@ export default function LoginPage() {
                     </p>
                   </div>
                 </div>
-                <input
-                  type="email"
-                  value={passkeyEmail}
-                  onChange={(e) => {
-                    setLocalPasskeyEmail(e.target.value)
-                    setSignError(null)
-                  }}
-                  placeholder="your@email.com"
-                  className="w-full h-11 glass rounded-xl px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-aurora-violet/50 mb-2"
-                  autoComplete="email"
-                />
                 <button
                   onClick={handlePasskeyConnect}
                   disabled={
                     isConnecting ||
-                    !passkeyEmail ||
                     passkeyState === "registering" ||
                     passkeyState === "awaiting_biometric" ||
                     passkeyState === "authenticating"
                   }
-                  className="gradient-bg-extended w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+                  className="gradient-bg-extended w-full h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {isConnecting ||
                   passkeyState === "registering" ||
@@ -423,6 +400,12 @@ export default function LoginPage() {
                     </>
                   )}
                 </button>
+                {signError && (
+                  <div className="mt-3 flex items-start gap-2 text-sm text-red-400">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{signError}</span>
+                  </div>
+                )}
               </div>
             )}
 
