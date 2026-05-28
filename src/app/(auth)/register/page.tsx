@@ -357,7 +357,7 @@ export default function RegisterPage() {
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen auroral-mesh flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-aurora-violet" />
           <p className="text-muted-foreground text-sm">
@@ -401,8 +401,8 @@ export default function RegisterPage() {
   const hasPasskey = detectedWallets.some((w) => w.id === "passkey")
 
   return (
-    <div className="min-h-screen auroral-mesh flex flex-col items-center justify-center px-4 py-12">
-      <div className="glass-flagship rounded-3xl p-8 md:p-10 max-w-md w-full mx-auto holo-border relative z-10">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-background">
+      <div className="rounded-3xl p-8 md:p-10 max-w-md w-full mx-auto relative z-10 bg-card/80 backdrop-blur-xl border border-white/10 shadow-xl">
         <Link
           href={Routes.HOME}
           className="block text-center font-heading text-2xl font-bold gradient-text-extended mb-8"
@@ -556,7 +556,7 @@ export default function RegisterPage() {
                         type="button"
                         onClick={() => handleSelectWallet("walletconnect")}
                         disabled={isConnecting}
-                        className="flex flex-col items-center justify-center gap-2 glass rounded-2xl p-4 min-h-[100px] transition-all hover:bg-white/[0.06] holo-border disabled:opacity-50 disabled:pointer-events-none"
+                        className="flex flex-col items-center justify-center gap-2 glass rounded-2xl p-4 min-h-[100px] transition-all hover:bg-white/[0.06] disabled:opacity-50 disabled:pointer-events-none"
                       >
                         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-aurora-violet/20 text-aurora-violet">
                           <QrCode className="h-5 w-5" />
