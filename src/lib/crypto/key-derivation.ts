@@ -1,8 +1,11 @@
-import { hkdf } from "@noble/hashes/hkdf.js"
-import { sha256 } from "@noble/hashes/sha2.js"
+import { pbkdf2Async } from "@noble/hashes/pbkdf2.js"
+// @ts-expect-error - sha512 is exported at runtime
+import { sha256, sha512 } from "@noble/hashes/sha2.js"
+import { bytesToHex } from "@noble/hashes/utils.js"
 
 const PEPPER =
   process.env.NEXT_PUBLIC_PASSKEY_PEPPER || "moistello-passkey-pepper-v1"
+const PBKDF2_ITERATIONS = 100_000
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
@@ -23,54 +26,64 @@ function crc16xmodem(data: Uint8Array): number {
 }
 
 function base32Encode(data: Uint8Array): string {
-  const length = data.length
   let result = ""
   let buffer = 0
   let bits = 0
-
-  for (let i = 0; i < length; i++) {
+  for (let i = 0; i < data.length; i++) {
     buffer = (buffer << 8) | data[i]
     bits += 8
     while (bits >= 5) {
       bits -= 5
-      const index = (buffer >>> bits) & 0x1f
-      result += BASE32_ALPHABET[index]
+      result += BASE32_ALPHABET[(buffer >>> bits) & 0x1f]
     }
   }
-
   if (bits > 0) {
     result += BASE32_ALPHABET[(buffer << (5 - bits)) & 0x1f]
   }
-
   return result
 }
 
-function hexEncode(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
+export function hexEncode(bytes: Uint8Array): string {
+  return bytesToHex(bytes)
+}
+
+export function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim().normalize("NFKD")
 }
 
 export async function deriveStellarKeypair(
   credentialId: string,
-  email: string
+  email: string,
+  serverPepper?: string
 ): Promise<{ publicKey: Uint8Array; secretKey: Uint8Array }> {
-  const encoder = new TextEncoder()
-  const ikm = encoder.encode(`${credentialId}:${email}:${PEPPER}`)
-  const salt = encoder.encode("moistello-stellar-key-v1")
-  const info = encoder.encode("stellar-ed25519")
+  const pepper = serverPepper || PEPPER
+  const normalizedEmail = normalizeEmail(email)
 
-  const { getPublicKeyAsync } = await import("@noble/ed25519")
+  const passphrase = `${normalizedEmail}:${credentialId}:${pepper}`
 
-  const seed = hkdf(sha256, ikm, salt, info, 32)
-  const publicKey = await getPublicKeyAsync(seed)
+  const saltInput = `${email}:${credentialId.slice(0, 16)}`
+  const salt = sha256(new TextEncoder().encode(saltInput))
+  const passphraseBytes = new TextEncoder().encode(passphrase)
+
+  const seed = await pbkdf2Async(
+    sha512,
+    passphraseBytes,
+    salt,
+    { c: PBKDF2_ITERATIONS, dkLen: 32 }
+  )
+
+  const ed = await import("@noble/ed25519") as unknown as { etc: { sha512Sync?: (...msgs: Uint8Array[]) => Uint8Array; concatBytes: (...arrs: Uint8Array[]) => Uint8Array }; getPublicKey: (seed: Uint8Array) => Uint8Array; sign: (msg: Uint8Array, key: Uint8Array) => Uint8Array }
+  if (!ed.etc.sha512Sync) {
+    const { sha512: sha512Hash } = await import("@noble/hashes/sha2.js") as unknown as { sha512: (...msgs: Uint8Array[]) => Uint8Array }
+    ed.etc.sha512Sync = (...msgs: Uint8Array[]) => sha512Hash(ed.etc.concatBytes(...msgs))
+  }
+  const publicKey = ed.getPublicKey(seed)
 
   return { publicKey, secretKey: seed }
 }
 
 export function publicKeyToStellarAddress(publicKey: Uint8Array): string {
   const versionByte = 0x30
-
   const payload = new Uint8Array(1 + 32)
   payload[0] = versionByte
   payload.set(publicKey, 1)
@@ -88,5 +101,3 @@ export function publicKeyToStellarAddress(publicKey: Uint8Array): string {
 export function secureZeroMemory(buffer: Uint8Array): void {
   buffer.fill(0)
 }
-
-export { hexEncode }

@@ -112,17 +112,17 @@ export function WalletConnectQR({
     )
   }
 
-  if (error || countdown === 0) {
+  if (error || countdown === 0 || pairingState === "timeout") {
     return (
       <div className={cn("flex flex-col items-center gap-3 py-4", className)}>
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20">
           <AlertCircle className="h-7 w-7 text-amber-400" />
         </div>
         <p className="text-sm font-medium text-foreground">
-          {countdown === 0 ? "Connection Timed Out" : "Connection Error"}
+          {countdown === 0 || pairingState === "timeout" ? "Connection Timed Out" : "Connection Error"}
         </p>
         <p className="text-xs text-muted-foreground text-center">
-          {error || "Scan the QR code within 120 seconds."}
+          {error || (pairingState === "timeout" ? "The QR code expired. Generate a new one to try again." : "Scan the QR code within 120 seconds.")}
         </p>
         <button
           type="button"

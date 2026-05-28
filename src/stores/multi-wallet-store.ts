@@ -50,6 +50,20 @@ interface MultiWalletState {
   wc2PairingError: string | null;
   wc2QrExpiresAt: number | null;
 
+  /* Passkey-specific state */
+  passkeyState: "idle" | "registering" | "awaiting_biometric" | "authenticating" | "deriving" | "connected" | "error";
+  passkeyEmail: string | null;
+  passkeyError: string | null;
+  passkeyPublicKey: string | null;
+
+  /* Ledger-specific state */
+  ledgerTransportType: "usb" | "ble" | null;
+  ledgerConnectionState: "idle" | "detecting" | "connecting" | "waiting_for_app" | "waiting_for_confirm" | "connected" | "disconnected" | "error" | "waiting_for_reconnect";
+  ledgerFirmwareVersion: string | null;
+  ledgerStellarAppVersion: string | null;
+  ledgerFirmwareWarnings: string[];
+  ledgerConnectionError: string | null;
+
   /* Actions */
   scanWallets: () => void;
   connect: (walletId: WalletId) => Promise<void>;
@@ -67,6 +81,21 @@ interface MultiWalletState {
   setWc2PairingError: (error: string | null) => void;
   setWc2RelayStatus: (status: MultiWalletState["wc2RelayStatus"]) => void;
   resetWc2Pairing: () => void;
+  /* Passkey actions */
+  setPasskeyState: (state: MultiWalletState["passkeyState"]) => void;
+  setPasskeyEmail: (email: string | null) => void;
+  setPasskeyError: (error: string | null) => void;
+  setPasskeyPublicKey: (key: string | null) => void;
+  resetPasskeyState: () => void;
+
+  /* Ledger actions */
+  setLedgerTransportType: (transportType: "usb" | "ble" | null) => void;
+  setLedgerConnectionState: (connectionState: MultiWalletState["ledgerConnectionState"]) => void;
+  setLedgerFirmwareVersion: (version: string | null) => void;
+  setLedgerStellarAppVersion: (version: string | null) => void;
+  setLedgerFirmwareWarnings: (warnings: string[]) => void;
+  setLedgerConnectionError: (error: string | null) => void;
+  resetLedgerState: () => void;
 }
 
 /* Helper: sync convenience fields from wallet record */
@@ -108,6 +137,20 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
   wc2RelayStatus: "healthy",
   wc2PairingError: null,
   wc2QrExpiresAt: null,
+
+  /* Passkey defaults */
+  passkeyState: "idle",
+  passkeyEmail: null,
+  passkeyError: null,
+  passkeyPublicKey: null,
+
+  /* Ledger defaults */
+  ledgerTransportType: null,
+  ledgerConnectionState: "idle",
+  ledgerFirmwareVersion: null,
+  ledgerStellarAppVersion: null,
+  ledgerFirmwareWarnings: [],
+  ledgerConnectionError: null,
 
   init: async () => {
     const sessionManager = getSessionManager();
@@ -424,6 +467,68 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
       wc2PairingState: "idle",
       wc2PairingError: null,
       wc2QrExpiresAt: null,
+    });
+  },
+
+  /* Passkey actions */
+  setPasskeyState: (passkeyState) => {
+    set({ passkeyState });
+  },
+
+  setPasskeyEmail: (passkeyEmail) => {
+    set({ passkeyEmail });
+  },
+
+  setPasskeyError: (passkeyError) => {
+    set({ passkeyError, passkeyState: passkeyError ? "error" : get().passkeyState });
+  },
+
+  setPasskeyPublicKey: (passkeyPublicKey) => {
+    set({ passkeyPublicKey });
+  },
+
+  resetPasskeyState: () => {
+    set({
+      passkeyState: "idle",
+      passkeyEmail: null,
+      passkeyError: null,
+      passkeyPublicKey: null,
+    });
+  },
+
+  /* Ledger actions */
+  setLedgerTransportType: (transportType) => {
+    set({ ledgerTransportType: transportType });
+  },
+
+  setLedgerConnectionState: (connectionState) => {
+    set({ ledgerConnectionState: connectionState });
+  },
+
+  setLedgerFirmwareVersion: (firmwareVersion) => {
+    set({ ledgerFirmwareVersion: firmwareVersion });
+  },
+
+  setLedgerStellarAppVersion: (stellarAppVersion) => {
+    set({ ledgerStellarAppVersion: stellarAppVersion });
+  },
+
+  setLedgerFirmwareWarnings: (warnings) => {
+    set({ ledgerFirmwareWarnings: warnings });
+  },
+
+  setLedgerConnectionError: (error) => {
+    set({ ledgerConnectionError: error });
+  },
+
+  resetLedgerState: () => {
+    set({
+      ledgerTransportType: null,
+      ledgerConnectionState: "idle",
+      ledgerFirmwareVersion: null,
+      ledgerStellarAppVersion: null,
+      ledgerFirmwareWarnings: [],
+      ledgerConnectionError: null,
     });
   },
 }));

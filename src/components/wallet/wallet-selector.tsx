@@ -22,12 +22,12 @@ const walletIcons: Record<string, string> = {
 interface HardwareWalletItemProps {
   name: string
   status: "detected" | "not_detected"
-  isWebUSBAvailable: boolean
+  isHardwareAvailable: boolean
   onOpenLedgerPrompt: () => void
 }
 
-function HardwareWalletItem({ name, status, isWebUSBAvailable, onOpenLedgerPrompt }: HardwareWalletItemProps) {
-  const isDetected = isWebUSBAvailable && status === "detected"
+function HardwareWalletItem({ name, status, isHardwareAvailable, onOpenLedgerPrompt }: HardwareWalletItemProps) {
+  const isDetected = isHardwareAvailable && status === "detected"
 
   return (
     <div className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 hover:border-aurora-violet/40 hover:bg-white/[0.06] transition-all">
@@ -48,13 +48,13 @@ function HardwareWalletItem({ name, status, isWebUSBAvailable, onOpenLedgerPromp
           )}
         </div>
         <p className="text-2xs text-muted-foreground mt-0.5">
-          {isWebUSBAvailable
+          {isHardwareAvailable
             ? "Maximum security — requires physical confirmation"
-            : "Not supported in this browser"}
+            : "Not supported in this browser. Try Chrome, Edge, or Brave."}
         </p>
       </div>
 
-      {isWebUSBAvailable ? (
+      {isHardwareAvailable ? (
         <button
           type="button"
           onClick={onOpenLedgerPrompt}
@@ -64,7 +64,7 @@ function HardwareWalletItem({ name, status, isWebUSBAvailable, onOpenLedgerPromp
         </button>
       ) : (
         <span className="text-xs text-muted-foreground/50 shrink-0">
-          Not supported
+          Unsupported browser
         </span>
       )}
     </div>
@@ -190,6 +190,8 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
   const disconnect = useMultiWalletStore((s) => s.disconnect)
 
   const isWebUSBAvailable = typeof navigator !== "undefined" && "usb" in navigator
+  const isWebBLEAvailable = typeof navigator !== "undefined" && "bluetooth" in navigator && typeof (navigator.bluetooth as { requestDevice?: () => unknown }).requestDevice === "function"
+  const isHardwareAvailable = isWebUSBAvailable || isWebBLEAvailable
   const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
   const wc2PairingUri = useMultiWalletStore((s) => s.wc2PairingUri)
@@ -323,7 +325,7 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
                   key={w.id}
                   name={w.name}
                   status={w.status}
-                  isWebUSBAvailable={isWebUSBAvailable}
+                  isHardwareAvailable={isHardwareAvailable}
                   onOpenLedgerPrompt={() => setShowLedgerPrompt(true)}
                 />
               ))}
@@ -432,7 +434,7 @@ export function WalletSelector({ className, variant = "inline" }: WalletSelector
                 key={w.id}
                 name={w.name}
                 status={w.status}
-                isWebUSBAvailable={isWebUSBAvailable}
+                isHardwareAvailable={isHardwareAvailable}
                 onOpenLedgerPrompt={() => setShowLedgerPrompt(true)}
               />
             ))}

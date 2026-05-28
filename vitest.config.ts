@@ -1,7 +1,9 @@
 import { defineConfig } from "vitest/config"
 import path from "path"
+import react from "@vitejs/plugin-react"
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     globals: true,
     environment: "jsdom",
@@ -12,10 +14,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  esbuild: {
-    include: /\.tsx?$/,
-  },
-  // oxc: false is required because vitest v4's oxc parser does not
-  // support the @/ path alias used by this project's tsconfig.
-  oxc: false,
 })

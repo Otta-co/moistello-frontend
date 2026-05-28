@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Wallet, CheckCircle, ExternalLink, ArrowRight, Loader2, AlertCircle } from "lucide-react"
+import { Wallet, CheckCircle, ExternalLink, ArrowRight, Loader2, AlertCircle, Fingerprint } from "lucide-react"
 import { useWalletStore } from "@/stores/wallet-store"
 import { useAuthStore } from "@/stores/auth-store"
 import { useUIStore } from "@/stores/ui-store"
 import { useMultiWalletStore } from "@/stores/multi-wallet-store"
 import { signMessage, isFreighterInstalled } from "@/lib/stellar"
-import { isWalletConnectEnabled } from "@/lib/wallet/features"
+import { isWalletConnectEnabled, isPasskeyEnabled } from "@/lib/wallet/features"
 import { WalletSelector } from "@/components/wallet/wallet-selector"
 import apiClient from "@/lib/api-client"
 import { Routes } from "@/lib/constants"
@@ -22,7 +22,9 @@ function shortenAddress(address: string): string {
 
 export default function LoginPage() {
   const router = useRouter()
-  const multiWalletEnabled = isWalletConnectEnabled()
+  const walletConnectEnabled = isWalletConnectEnabled()
+  const passkeyEnabled = isPasskeyEnabled()
+  const multiWalletEnabled = walletConnectEnabled || passkeyEnabled
 
   const isConnected = useWalletStore((s) => s.isConnected)
   const address = useWalletStore((s) => s.address)
@@ -35,6 +37,9 @@ export default function LoginPage() {
   const mwIsConnecting = useMultiWalletStore((s) => s.isConnecting)
   const mwError = useMultiWalletStore((s) => s.error)
   const mwSignMessage = useMultiWalletStore((s) => s.signMessage)
+  const mwConnect = useMultiWalletStore((s) => s.connect)
+  const setPasskeyEmail = useMultiWalletStore((s) => s.setPasskeyEmail)
+  const setPasskeyState = useMultiWalletStore((s) => s.setPasskeyState)
 
   const isAuthLoading = useAuthStore((s) => s.isLoading)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -50,6 +55,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>("connect")
   const [isSigning, setIsSigning] = useState(false)
   const [signError, setSignError] = useState<string | null>(null)
+  const [passkeyEmail, setLocalPasskeyEmail] = useState("")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -73,6 +79,25 @@ export default function LoginPage() {
         title: "Connection Failed",
         description:
           err instanceof Error ? err.message : "Failed to connect wallet",
+      })
+    }
+  }
+
+  const handlePasskeyConnect = async () => {
+    if (!passkeyEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passkeyEmail)) return
+
+    setPasskeyEmail(passkeyEmail)
+    setPasskeyState("registering")
+    try {
+      await mwConnect("passkey")
+      setStep("sign")
+      setSignError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Passkey connection failed"
+      addToast({
+        type: "error",
+        title: "Passkey Failed",
+        description: message,
       })
     }
   }
@@ -184,7 +209,51 @@ export default function LoginPage() {
           {!activeConnected ? (
             <div className="text-center">
               {multiWalletEnabled ? (
-                <WalletSelector variant="overlay" />
+                <div className="space-y-4">
+                  {walletConnectEnabled && <WalletSelector variant="overlay" />}
+                  {walletConnectEnabled && passkeyEnabled && (
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-white/10" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-card px-2 text-muted-foreground">or</span>
+                      </div>
+                    </div>
+                  )}
+                  {passkeyEnabled && (
+                    <div className="glass rounded-2xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl gradient-bg-extended flex items-center justify-center text-white shrink-0">
+                        <Fingerprint className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">Passkey / Email</p>
+                        <p className="text-xs text-muted-foreground">No wallet needed</p>
+                      </div>
+                    </div>
+                    <input
+                      type="email"
+                      value={passkeyEmail}
+                      onChange={(e) => setLocalPasskeyEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full h-10 glass rounded-xl px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-aurora-violet/50 mb-2"
+                      autoComplete="email"
+                    />
+                    <button
+                      onClick={handlePasskeyConnect}
+                      disabled={mwIsConnecting || !passkeyEmail}
+                      className="gradient-bg-extended w-full h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-heading font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {mwIsConnecting ? (
+                        <><Loader2 className="h-3 w-3 animate-spin" /> Connecting...</>
+                      ) : (
+                        <><Fingerprint className="h-3 w-3" /> Sign in with Passkey</>
+                      )}
+                    </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-2xl gradient-bg-extended flex items-center justify-center text-white mx-auto mb-4">

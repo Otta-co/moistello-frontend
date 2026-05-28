@@ -1,98 +1,157 @@
 import { WalletAdapter, WalletMeta, SignOptions, NetworkType } from "../types"
-import { detectAvailableTransport, createTransport } from "./ledger-transport"
+import { detectAvailableTransport, LedgerTransportManager } from "./ledger-transport"
+import type { ConnectionState } from "./ledger-transport"
 
-const DERIVATION_PATH = "44'/148'/0'"
-
-function bytesToHex(bytes: Uint8Array | ArrayBuffer | ArrayLike<number>): string {
-  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayLike<number>)
-  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("")
+interface StellarApp {
+  getPublicKey: (path: string, opts?: { display?: boolean; chainCode?: boolean }) => Promise<{ publicKey: string }>
+  signTransaction: (path: string, xdr: string) => Promise<{ signature: string }>
+  getAppConfiguration: () => Promise<{ version: string; flag?: string }>
 }
 
-export function createLedgerAdapter(): WalletAdapter {
+const DERIVATION_PATH = "44'/148'/0'"
+const MIN_FIRMWARE_MAJOR = 2
+const MIN_STELLAR_APP_MAJOR = 3
+const MIN_STELLAR_APP_MINOR = 3
+
+function makeError(
+  adapter: string,
+  code: string,
+  message: string,
+  extra?: Record<string, unknown>,
+): Record<string, unknown> {
+  return { adapter, code, message, ...extra }
+}
+
+function networkPassphrase(network: NetworkType): string {
+  return network === "mainnet"
+    ? "Public Global Stellar Network ; September 2015"
+    : "Test SDF Network ; September 2015"
+}
+
+function validatePublicKey(pubkey: string): boolean {
+  return !!pubkey && pubkey.length === 56 && pubkey.startsWith("G")
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
+  }
+  return bytes
+}
+
+function parseLedgerError(err: unknown, context: string): Record<string, unknown> {
+  const msg = err instanceof Error ? err.message : String(err)
+  const lower = msg.toLowerCase()
+
+  if (lower.includes("denied") || lower.includes("reject") || lower.includes("cancel")) {
+    return makeError("ledger", "user_rejected", `${context} rejected on Ledger device.`)
+  }
+  if (lower.includes("lock") || lower.includes("0x6982")) {
+    return makeError("ledger", "ledger_device_locked", "Please unlock your Ledger with your PIN.")
+  }
+  if (lower.includes("0x6511")) {
+    return makeError("ledger", "ledger_device_locked", "Ledger is locked. Unlock it and open the Stellar app.")
+  }
+  if (lower.includes("app") || lower.includes("stellar") || lower.includes("not open")) {
+    return makeError("ledger", "ledger_stellar_app_not_open", "Please open the Stellar app on your Ledger.")
+  }
+  if (lower.includes("not supported") || lower.includes("browser")) {
+    return makeError("ledger", "ledger_unsupported_browser", "Ledger requires Chrome, Edge, or Brave browser.", { browser: navigator.userAgent })
+  }
+  return makeError("ledger", "ledger_sign_failed", `Failed to ${context.toLowerCase()} on Ledger.`, { cause: msg })
+}
+
+export function createLedgerAdapter(
+  transportManager?: LedgerTransportManager,
+  onStateChange?: (state: ConnectionState) => void,
+): WalletAdapter {
+  const manager = transportManager ?? new LedgerTransportManager(onStateChange)
+  let stellarApp: StellarApp | null = null
+  let currentPublicKey: string | null = null
+  const currentNetwork: NetworkType = "testnet"
+  let cachedFirmware: { firmware: string; stellarApp: string; warnings: string[] } | null = null
+
   const meta: WalletMeta = {
     id: "ledger",
     name: "Ledger",
     category: "hardware",
     icon: "ledger-icon",
-    installUrl: "https://www.ledger.com/start/",
+    installUrl: "https://www.ledger.com/stellar-wallet",
     description: "Hardware wallet — maximum security for large amounts",
-    priority: 5,
+    priority: 20,
     isAvailable: () => {
       if (typeof window === "undefined") return false
-      return "usb" in navigator
+      return detectAvailableTransport() !== "none"
     },
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let transport: any = null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let stellarApp: any = null
-  let currentPublicKey: string | null = null
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function ensureConnection(): Promise<{ transport: any; stellar: any }> {
-    if (transport && stellarApp) {
-      return { transport, stellar: stellarApp }
-    }
-
-    const transportType = detectAvailableTransport()
-    if (transportType === "none") {
-      throw {
-        adapter: "ledger" as const,
-        code: "not_installed" as const,
-        message:
-          "No compatible transport available. Connect your Ledger via USB on desktop or Bluetooth on mobile.",
-      }
-    }
-
-    const lt = await createTransport(transportType)
-    transport = await lt.create()
-
+  async function ensureStellarApp(): Promise<typeof stellarApp> {
+    if (stellarApp && manager.getTransport()) return stellarApp
+    const { transport } = await manager.detectAndCreateTransport()
     const Str = (await import("@ledgerhq/hw-app-str")).default
-    stellarApp = new Str(transport)
-    return { transport, stellar: stellarApp }
+    stellarApp = new Str(transport) as typeof stellarApp
+    return stellarApp
+  }
+
+  async function checkFirmware(app: typeof stellarApp): Promise<{ firmware: string; stellarApp: string; warnings: string[] }> {
+    const warnings: string[] = []
+    let firmwareStr = "0.0.0"
+    let appVersion = "0.0.0"
+
+    try {
+      const config = await app!.getAppConfiguration()
+      const parts = (config.version || "0.0.0").split(".").map(Number)
+      firmwareStr = `${parts[0] ?? 0}.${parts[1] ?? 0}.${parts[2] ?? 0}`
+      appVersion = config.flag || config.version || "0.0.0"
+
+      if ((parts[0] ?? 0) < MIN_FIRMWARE_MAJOR) {
+        warnings.push(`Ledger firmware (v${firmwareStr}) is outdated. Update to v${MIN_FIRMWARE_MAJOR}.0+ via Ledger Live.`)
+      }
+
+      const appParts = appVersion.split(".").map(Number)
+      if ((appParts[0] ?? 0) < MIN_STELLAR_APP_MAJOR || ((appParts[0] ?? 0) === MIN_STELLAR_APP_MAJOR && (appParts[1] ?? 0) < MIN_STELLAR_APP_MINOR)) {
+        warnings.push(`Stellar app v${MIN_STELLAR_APP_MAJOR}.${MIN_STELLAR_APP_MINOR}.0+ recommended for full transaction detail display. Update via Ledger Live Manager.`)
+      }
+    } catch {
+    }
+
+    cachedFirmware = { firmware: firmwareStr, stellarApp: appVersion, warnings }
+    return cachedFirmware
   }
 
   async function closeConnection(): Promise<void> {
-    if (transport) {
-      try { await transport.close() } catch {}
-      transport = null
-    }
     stellarApp = null
     currentPublicKey = null
+    cachedFirmware = null
+    await manager.closeTransport()
   }
 
   return {
     meta,
 
     async connect() {
+      if (typeof window === "undefined") {
+        throw makeError("ledger", "ledger_unsupported_browser", "SSR: no browser APIs", { browser: "ssr" })
+      }
+
       try {
-        const { stellar } = await ensureConnection()
-        const result = await stellar.getPublicKey(DERIVATION_PATH)
-        currentPublicKey = result.publicKey
-        return { publicKey: result.publicKey }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
+        const app = await ensureStellarApp()
+        await checkFirmware(app)
+        const result = await app!.getPublicKey(DERIVATION_PATH, { display: true, chainCode: false })
+        const pubKey = result.publicKey
+
+        if (!validatePublicKey(pubKey)) {
+          await closeConnection()
+          throw makeError("ledger", "ledger_device_not_responding", "Invalid public key from Ledger.")
+        }
+
+        currentPublicKey = pubKey
+        return { publicKey: pubKey }
+      } catch (err: unknown) {
         await closeConnection()
-        if (err.message?.includes("denied") || err.message?.includes("cancel")) {
-          throw {
-            adapter: "ledger" as const,
-            code: "user_rejected" as const,
-            message: "Connection cancelled on Ledger device.",
-          }
-        }
-        if (err.message?.includes("locked") || err.message?.includes("0x6511")) {
-          throw {
-            adapter: "ledger" as const,
-            code: "timeout" as const,
-            message: "Ledger is locked. Unlock it and open the Stellar app.",
-          }
-        }
-        throw {
-          adapter: "ledger" as const,
-          code: "not_installed" as const,
-          message: "Ledger not detected. Is it plugged in and unlocked with the Stellar app open?",
-        }
+        if (err && typeof err === "object" && "adapter" in err) throw err
+        throw parseLedgerError(err, "Connection")
       }
     },
 
@@ -101,9 +160,9 @@ export function createLedgerAdapter(): WalletAdapter {
     },
 
     async isConnected() {
-      if (!transport || !stellarApp) return false
+      if (!manager.getTransport() || !stellarApp) return false
       try {
-        await stellarApp.getPublicKey(DERIVATION_PATH)
+        await stellarApp.getAppConfiguration()
         return true
       } catch {
         return false
@@ -111,85 +170,127 @@ export function createLedgerAdapter(): WalletAdapter {
     },
 
     async getPublicKey() {
+      if (currentPublicKey) return currentPublicKey
+      const app = await ensureStellarApp()
+      const result = await app!.getPublicKey(DERIVATION_PATH)
+      currentPublicKey = result.publicKey
       if (!currentPublicKey) {
-        const { stellar } = await ensureConnection()
-        const result = await stellar.getPublicKey(DERIVATION_PATH)
-        currentPublicKey = result.publicKey
-      }
-      if (!currentPublicKey) {
-        throw { adapter: "ledger" as const, code: "not_installed" as const, message: "Not connected" }
+        throw makeError("ledger", "not_installed", "Not connected to Ledger.")
       }
       return currentPublicKey
     },
 
     async signMessage(message: string) {
-      const { stellar } = await ensureConnection()
-      if (!currentPublicKey) {
-        const pk = await stellar.getPublicKey(DERIVATION_PATH)
-        currentPublicKey = pk.publicKey
+      if (typeof window === "undefined") {
+        throw makeError("ledger", "ledger_unsupported_browser", "SSR: no browser APIs", { browser: "ssr" })
       }
-      if (!currentPublicKey) {
-        throw { adapter: "ledger" as const, code: "not_installed" as const, message: "Not connected" }
+
+      const app = await ensureStellarApp()
+      const pk = currentPublicKey || (await this.getPublicKey())
+
+      if (!message || message.length === 0) {
+        throw makeError("ledger", "ledger_xdr_invalid", "Message cannot be empty.")
+      }
+      if (message.length > 8192) {
+        throw makeError("ledger", "ledger_xdr_invalid", "Message too long (max 8192 bytes).")
       }
 
       try {
         const encoder = new TextEncoder()
         const data = encoder.encode(message)
-        const result = await stellar.sign(DERIVATION_PATH, data)
+        const valueToSign = message.length > 64
+          ? new Uint8Array(await crypto.subtle.digest("SHA-256", data))
+          : data
 
-        return {
-          signature: bytesToHex(result.signature),
-          publicKey: currentPublicKey,
-        }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        if (err.message?.includes("denied") || err.statusText?.includes("denied")) {
-          throw {
-            adapter: "ledger" as const,
-            code: "user_rejected" as const,
-            message: "Signature rejected on Ledger device.",
-          }
-        }
-        throw {
-          adapter: "ledger" as const,
-          code: "internal" as const,
-          message: "Failed to sign on Ledger",
-          cause: err.message || String(err),
-        }
+        const { TransactionBuilder, Networks, Operation, BASE_FEE, Memo } = await import("@stellar/stellar-base")
+        const txBuilder = new TransactionBuilder(
+          { accountId: () => pk, sequenceNumber: () => "0" } as never,
+          { fee: BASE_FEE, networkPassphrase: Networks.TESTNET, memo: Memo.none() },
+        )
+        txBuilder.addOperation(
+          Operation.manageData({ name: "Moistello Auth", value: Buffer.from(valueToSign) }),
+        )
+        const built = txBuilder.build()
+        const xdr = built.toEnvelope().toXDR("base64")
+
+        const result = await app!.signTransaction(DERIVATION_PATH, xdr)
+        return { signature: result.signature, publicKey: pk }
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "adapter" in err) throw err
+        throw parseLedgerError(err, "Signature")
       }
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    async signTransaction(xdr: string, _?: SignOptions) {
-      const { stellar } = await ensureConnection()
-      if (!currentPublicKey) {
-        const pk = await stellar.getPublicKey(DERIVATION_PATH)
-        currentPublicKey = pk.publicKey
+    async signTransaction(xdr: string, opts?: SignOptions) {
+      if (typeof window === "undefined") {
+        throw makeError("ledger", "ledger_unsupported_browser", "SSR: no browser APIs", { browser: "ssr" })
+      }
+
+      const app = await ensureStellarApp()
+      const pk = currentPublicKey || (await this.getPublicKey())
+      const network = opts?.network ?? "testnet"
+
+      if (!xdr || xdr.length === 0) {
+        throw makeError("ledger", "ledger_xdr_invalid", "Transaction XDR is empty.")
       }
 
       try {
-        const result = await stellar.signTransaction(DERIVATION_PATH, xdr)
-        return { signedXdr: result.signature }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        if (err.message?.includes("denied")) {
-          throw {
-            adapter: "ledger" as const,
-            code: "user_rejected" as const,
-            message: "Transaction rejected on Ledger device. Verify the details on your device screen.",
-          }
+        const { Transaction } = await import("@stellar/stellar-base")
+        const nwPassphrase = networkPassphrase(network)
+        const tx = new Transaction(xdr, nwPassphrase)
+
+        if (tx.source !== pk) {
+          throw makeError("ledger", "ledger_wrong_account",
+            `Transaction is for account ${tx.source}. Ledger has account ${pk}.`,
+            { expected: tx.source, actual: pk },
+          )
         }
-        throw {
-          adapter: "ledger" as const,
-          code: "internal" as const,
-          message: "Failed to sign transaction on Ledger",
-          cause: err.message || String(err),
-        }
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "adapter" in err) throw err
+        throw makeError("ledger", "ledger_xdr_invalid", "Invalid or unparseable transaction XDR.")
+      }
+
+      if (network === "mainnet") {
+        throw makeError("ledger", "ledger_mainnet_confirm_required",
+          "You are about to sign a MAINNET transaction with real funds. Explicit confirmation required.",
+        )
+      }
+
+      try {
+        const result = await app!.signTransaction(DERIVATION_PATH, xdr)
+        const { Transaction } = await import("@stellar/stellar-base")
+        const nwPassphrase = networkPassphrase(network)
+        const tx = new Transaction(xdr, nwPassphrase)
+        const signatureBytes = hexToBytes(result.signature)
+        const sigBase64 = btoa(String.fromCharCode(...signatureBytes))
+        tx.addSignature(pk, sigBase64)
+        const signedXdr = tx.toEnvelope().toXDR("base64")
+        return { signedXdr }
+      } catch (err: unknown) {
+        if (err && typeof err === "object" && "adapter" in err) throw err
+        await closeConnection()
+        throw parseLedgerError(err, "Transaction signing")
       }
     },
 
     async getNetwork() {
-      return "testnet" as NetworkType
+      return currentNetwork
+    },
+
+    async getFirmwareVersion() {
+      if (cachedFirmware) return cachedFirmware
+      const app = await ensureStellarApp()
+      return checkFirmware(app)
+    },
+
+    async pingDevice() {
+      if (!manager.getTransport() || !stellarApp) return false
+      try {
+        await stellarApp.getAppConfiguration()
+        return true
+      } catch {
+        return false
+      }
     },
   }
 }

@@ -3,10 +3,9 @@ import {
   deriveStellarKeypair,
   publicKeyToStellarAddress,
   secureZeroMemory,
+  hexEncode,
 } from "@/lib/crypto/key-derivation"
 
-const RP_NAME = "Moistello"
-const RP_ID = process.env.NEXT_PUBLIC_PASSKEY_RP_ID || "localhost"
 const CREDENTIAL_STORAGE_KEY = "moistello_passkey_credential"
 
 interface StoredCredential {
@@ -15,27 +14,37 @@ interface StoredCredential {
   publicKeyRaw: string
 }
 
+interface PasskeySession {
+  credentialId: string
+  email: string
+  publicKey: Uint8Array
+  secretKey: Uint8Array
+  stellarAddress: string
+  pepper: string
+}
+
+function resolveNetworkPassphrase(network?: NetworkType, networkPassphrase?: string): string {
+  if (networkPassphrase) return networkPassphrase
+  if (network === "mainnet") return "Public Global Stellar Network ; September 2015"
+  return "Test SDF Network ; September 2015"
+}
+
 export function createPasskeyAdapter(): WalletAdapter {
   const meta: WalletMeta = {
     id: "passkey",
-    name: "Passkey",
+    name: "Passkey / Email",
     category: "passkey",
     icon: "passkey-icon",
     installUrl: "",
-    description: "Sign in with biometrics. No wallet needed.",
-    priority: 1,
+    description: "Sign in with biometrics or email. No wallet needed.",
+    priority: 30,
     isAvailable: () => {
-      return (
-        typeof window !== "undefined" &&
-        typeof PublicKeyCredential !== "undefined"
-      )
+      if (typeof window === "undefined") return false
+      return typeof PublicKeyCredential !== "undefined"
     },
   }
 
-  let currentKeypair: {
-    publicKey: Uint8Array
-    secretKey: Uint8Array
-  } | null = null
+  let session: PasskeySession | null = null
 
   function getStoredCredential(): StoredCredential | null {
     if (typeof window === "undefined") return null
@@ -53,214 +62,247 @@ export function createPasskeyAdapter(): WalletAdapter {
     localStorage.setItem(CREDENTIAL_STORAGE_KEY, JSON.stringify(cred))
   }
 
-  function zeroKeypair(): void {
-    if (currentKeypair) {
-      secureZeroMemory(currentKeypair.secretKey)
+  function zeroSession(): void {
+    if (session) {
+      secureZeroMemory(session.secretKey)
     }
-    currentKeypair = null
+    session = null
   }
 
-  function base64URLToBuffer(base64url: string): ArrayBuffer {
-    const binary = atob(base64url.replace(/-/g, "+").replace(/_/g, "/"))
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i)
+  async function apiPost<T>(url: string, body: unknown): Promise<T> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw { adapter: "passkey" as const, code: "internal" as const, message: (data as Record<string, unknown>).error as string || "Request failed" }
     }
-    return bytes.buffer
-  }
-
-  function toHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
+    return res.json()
   }
 
   return {
     meta,
 
-    async connect() {
-      const stored = getStoredCredential()
-      if (stored) {
-        return authenticateWithStoredCredential(stored)
+    async connect(email?: string) {
+      if (typeof window === "undefined") {
+        throw { adapter: "passkey", code: "not_supported" as const, message: "Not available server-side" }
       }
-      return registerNewCredential()
+
+      if (session) {
+        return { publicKey: session.stellarAddress }
+      }
+
+      const { startRegistration, startAuthentication } = await import("@simplewebauthn/browser")
+      const stored = getStoredCredential()
+
+      if (stored && !email) {
+        const { options } = await apiPost<{ options: Record<string, unknown> }>(
+          "/api/auth/passkey/generate-options",
+          { credentialId: stored.credentialId, mode: "authenticate" }
+        )
+
+        let assertion: unknown
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          assertion = await startAuthentication({ optionsJSON: options as any })
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === "NotAllowedError") {
+            throw { adapter: "passkey", code: "user_rejected" as const, message: "Authentication cancelled" }
+          }
+          throw { adapter: "passkey", code: "internal" as const, message: "Authentication failed", cause: String(err) }
+        }
+
+        const verifyResult = await apiPost<{ verified: boolean; email: string; pepper: string }>(
+          "/api/auth/passkey/auth-verify",
+          { credentialId: stored.credentialId, email: stored.email, assertion }
+        )
+
+        const keypair = await deriveStellarKeypair(
+          stored.credentialId,
+          stored.email,
+          verifyResult.pepper
+        )
+        const stellarAddress = publicKeyToStellarAddress(keypair.publicKey)
+        session = {
+          credentialId: stored.credentialId,
+          email: stored.email,
+          publicKey: keypair.publicKey,
+          secretKey: keypair.secretKey,
+          stellarAddress,
+          pepper: verifyResult.pepper,
+        }
+        return { publicKey: stellarAddress }
+      }
+
+      const resolvedEmail = email
+      if (!resolvedEmail) {
+        throw { adapter: "passkey", code: "user_rejected" as const, message: "Email is required" }
+      }
+
+      const { options } = await apiPost<{ options: Record<string, unknown> }>(
+        "/api/auth/passkey/generate-options",
+        { email: resolvedEmail, mode: "register" }
+      )
+
+      let attestation: unknown
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        attestation = await startRegistration({ optionsJSON: options as any })
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "NotAllowedError") {
+          throw { adapter: "passkey", code: "user_rejected" as const, message: "Registration cancelled" }
+        }
+        throw { adapter: "passkey", code: "internal" as const, message: "Passkey creation failed", cause: String(err) }
+      }
+
+      const attestationRecord = attestation as { rawId?: string; id?: string }
+      const credentialId = attestationRecord.rawId || attestationRecord.id || ""
+
+      const verifyResult = await apiPost<{ verified: boolean; email: string; credentialId: string; pepper: string }>(
+        "/api/auth/passkey/register",
+        { attestation, email: resolvedEmail }
+      )
+
+      const keypair = await deriveStellarKeypair(
+        credentialId,
+        resolvedEmail,
+        verifyResult.pepper
+      )
+      const stellarAddress = publicKeyToStellarAddress(keypair.publicKey)
+
+      storeCredential({
+        credentialId,
+        email: resolvedEmail,
+        publicKeyRaw: hexEncode(keypair.publicKey),
+      })
+
+      session = {
+        credentialId,
+        email: resolvedEmail,
+        publicKey: keypair.publicKey,
+        secretKey: keypair.secretKey,
+        stellarAddress,
+        pepper: verifyResult.pepper,
+      }
+
+      return { publicKey: stellarAddress }
     },
 
     async disconnect() {
-      zeroKeypair()
+      zeroSession()
     },
 
     async isConnected() {
-      if (currentKeypair !== null) return true
-      return getStoredCredential() !== null
+      return session !== null
     },
 
     async getPublicKey() {
-      if (!currentKeypair) {
-        throw {
-          adapter: "passkey" as const,
-          code: "not_installed" as const,
-          message: "Not authenticated",
-        }
+      if (!session) {
+        throw { adapter: "passkey", code: "not_installed" as const, message: "Not authenticated" }
       }
-      return publicKeyToStellarAddress(currentKeypair.publicKey)
+      return session.stellarAddress
     },
 
     async signMessage(message: string) {
-      if (!currentKeypair) {
-        throw {
-          adapter: "passkey" as const,
-          code: "not_installed" as const,
-          message: "Not authenticated",
-        }
+      if (!session) {
+        throw { adapter: "passkey", code: "not_installed" as const, message: "Not authenticated" }
       }
 
       try {
-        const { signAsync } = await import("@noble/ed25519")
-        const encoder = new TextEncoder()
-        const msgBytes = encoder.encode(message)
-        const signature = await signAsync(
-          msgBytes,
-          currentKeypair.secretKey
-        )
-
+        const { sign } = await import("@noble/ed25519") as unknown as { sign: (m: Uint8Array, k: Uint8Array) => Uint8Array }
+        const msgBytes = new TextEncoder().encode(message)
+        const signature = sign(msgBytes, session.secretKey)
         return {
-          signature: toHex(signature),
-          publicKey: publicKeyToStellarAddress(currentKeypair.publicKey),
+          signature: hexEncode(signature),
+          publicKey: session.stellarAddress,
         }
       } catch (err: unknown) {
         throw {
-          adapter: "passkey" as const,
+          adapter: "passkey",
           code: "internal" as const,
           message: "Failed to sign message",
           cause: err instanceof Error ? err.message : String(err),
         }
-      } finally {
-        zeroKeypair()
       }
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async signTransaction(xdr: string, opts?: SignOptions) {
-      if (!currentKeypair) {
-        throw {
-          adapter: "passkey" as const,
-          code: "not_installed" as const,
-          message: "Not authenticated",
-        }
+      if (!session) {
+        throw { adapter: "passkey", code: "not_installed" as const, message: "Not authenticated" }
       }
 
       try {
-        const { signAsync } = await import("@noble/ed25519")
-        const encoder = new TextEncoder()
-        const xdrBytes = encoder.encode(xdr)
-        await signAsync(xdrBytes, currentKeypair.secretKey)
+        const { Keypair, Transaction, xdr: stellarXdr } = await import("@stellar/stellar-base")
+        const networkPassphrase = resolveNetworkPassphrase(opts?.network, opts?.networkPassphrase)
 
-        return { signedXdr: xdr }
+        let envelope
+        try {
+          envelope = stellarXdr.TransactionEnvelope.fromXDR(xdr, "base64")
+        } catch (parseErr: unknown) {
+          throw {
+            adapter: "passkey",
+            code: "internal" as const,
+            message: "Invalid transaction XDR format",
+            cause: parseErr instanceof Error ? parseErr.message : String(parseErr),
+          }
+        }
+
+        let tx
+        try {
+          tx = new Transaction(envelope, networkPassphrase)
+        } catch (txErr: unknown) {
+          throw {
+            adapter: "passkey",
+            code: "internal" as const,
+            message: "Failed to create transaction from envelope",
+            cause: txErr instanceof Error ? txErr.message : String(txErr),
+          }
+        }
+
+        let kp
+        try {
+          const secretKeyBytes = new Uint8Array(session.secretKey)
+          kp = Keypair.fromRawEd25519Seed(Buffer.from(secretKeyBytes))
+        } catch (kpErr: unknown) {
+          throw {
+            adapter: "passkey",
+            code: "internal" as const,
+            message: "Failed to create keypair from session key",
+            cause: kpErr instanceof Error ? kpErr.message : String(kpErr),
+          }
+        }
+
+        try {
+          tx.sign(kp)
+        } catch (signErr: unknown) {
+          throw {
+            adapter: "passkey",
+            code: "internal" as const,
+            message: "Failed to apply signature to transaction",
+            cause: signErr instanceof Error ? signErr.message : String(signErr),
+          }
+        }
+
+        const signedXdr = tx.toEnvelope().toXDR("base64")
+        return { signedXdr }
       } catch (err: unknown) {
+        // Re-throw already-formatted errors from granular try/catch blocks
+        if (err && typeof err === "object" && "adapter" in err) {
+          throw err
+        }
         throw {
-          adapter: "passkey" as const,
+          adapter: "passkey",
           code: "internal" as const,
           message: "Failed to sign transaction",
           cause: err instanceof Error ? err.message : String(err),
         }
-      } finally {
-        zeroKeypair()
       }
     },
 
     async getNetwork() {
       return "testnet" as NetworkType
     },
-  }
-
-  async function authenticateWithStoredCredential(
-    stored: StoredCredential
-  ): Promise<{ publicKey: string }> {
-    const credentialIdBuffer = base64URLToBuffer(stored.credentialId)
-
-    const publicKeyCredential = (await navigator.credentials.get({
-      publicKey: {
-        rpId: RP_ID,
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        allowCredentials: [
-          {
-            id: credentialIdBuffer,
-            type: "public-key",
-            transports: ["internal", "hybrid"],
-          },
-        ],
-        userVerification: "required",
-      },
-      mediation: "optional",
-    })) as PublicKeyCredential | null
-
-    if (!publicKeyCredential) {
-      throw {
-        adapter: "passkey" as const,
-        code: "internal" as const,
-        message: "Authentication failed",
-      }
-    }
-
-    const keypair = await deriveStellarKeypair(
-      stored.credentialId,
-      stored.email
-    )
-    currentKeypair = keypair
-
-    const stellarAddress = publicKeyToStellarAddress(keypair.publicKey)
-    return { publicKey: stellarAddress }
-  }
-
-  async function registerNewCredential(): Promise<{ publicKey: string }> {
-    const email =
-      prompt("Enter your email to create a passkey:") ||
-      `user-${Date.now()}@moistello.io`
-
-    const publicKeyCredential = (await navigator.credentials.create({
-      publicKey: {
-        rp: { name: RP_NAME, id: RP_ID },
-        user: {
-          id: new TextEncoder().encode(email),
-          name: email,
-          displayName: email,
-        },
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        pubKeyCredParams: [
-          { alg: -7, type: "public-key" },
-          { alg: -257, type: "public-key" },
-          { alg: -8, type: "public-key" },
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required",
-          residentKey: "required",
-        },
-        timeout: 120000,
-      },
-    })) as PublicKeyCredential | null
-
-    if (!publicKeyCredential) {
-      throw {
-        adapter: "passkey" as const,
-        code: "internal" as const,
-        message: "Registration failed — no credential returned",
-      }
-    }
-
-    const credentialId = publicKeyCredential.id
-
-    const keypair = await deriveStellarKeypair(credentialId, email)
-    currentKeypair = keypair
-
-    storeCredential({
-      credentialId,
-      email,
-      publicKeyRaw: toHex(keypair.publicKey),
-    })
-
-    const stellarAddress = publicKeyToStellarAddress(keypair.publicKey)
-    return { publicKey: stellarAddress }
   }
 }
