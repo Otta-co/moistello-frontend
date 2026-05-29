@@ -9,10 +9,11 @@ import {
   Sun,
   Moon,
   ShieldQuestion,
-  Info,
   Scale,
   Lock,
-  Home,
+  Code,
+  BookOpen,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useUIStore } from "@/stores/ui-store";
@@ -30,9 +31,10 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   const toggleMenu = useCallback(() => setMenuOpen((prev) => !prev), []);
 
   const navItems = [
-    { label: "Home", href: "/", icon: <Home className="h-4 w-4" /> },
-    { label: "How It Works", href: "/how-it-works", icon: <ShieldQuestion className="h-4 w-4" /> },
-    { label: "FAQ", href: "/faq", icon: <Info className="h-4 w-4" /> },
+    { label: "How It Works", href: "/how-it-works" },
+    { label: "Developers", href: "/developers" },
+    { label: "Docs", href: "/docs" },
+    { label: "Support", href: "/support" },
   ];
 
   return (
@@ -169,11 +171,11 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                   <p className="px-3 pt-2 pb-2 font-heading text-[10px] tracking-[0.25em] uppercase text-muted-foreground/60">
                     Navigate
                   </p>
-                  {[
-                    { label: "Home", href: "/", icon: <Home className="h-[18px] w-[18px]" /> },
+{[
                     { label: "How It Works", href: "/how-it-works", icon: <ShieldQuestion className="h-[18px] w-[18px]" /> },
-                    { label: "FAQ", href: "/faq", icon: <Info className="h-[18px] w-[18px]" /> },
-                    { label: "About", href: "/about", icon: <Info className="h-[18px] w-[18px]" /> },
+                    { label: "Developers", href: "/developers", icon: <Code className="h-[18px] w-[18px]" /> },
+                    { label: "Docs", href: "/docs", icon: <BookOpen className="h-[18px] w-[18px]" /> },
+                    { label: "Support", href: "/support", icon: <HelpCircle className="h-[18px] w-[18px]" /> },
                   ].map((item) => (
                     <Link
                       key={item.href}
@@ -247,6 +249,25 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
       {/* ════════════════ PAGE CONTENT ════════════════ */}
       <div className="pt-20">{children}</div>
+
+      {/* ════════════════ FOOTER ════════════════ */}
+      <footer className="glass mt-20 py-8 border-t border-border">
+        <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
+          <span>&copy; {new Date().getFullYear()} Moistello</span>
+          <nav className="flex flex-wrap justify-center gap-6">
+            <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
+            <Link href="/how-it-works" className="hover:text-foreground transition-colors">How It Works</Link>
+            <Link href="/developers" className="hover:text-foreground transition-colors">Developers</Link>
+            <Link href="/docs" className="hover:text-foreground transition-colors">Docs</Link>
+            <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+            <Link href="/become-a-contributor" className="hover:text-foreground transition-colors">Contribute</Link>
+            <Link href="/support" className="hover:text-foreground transition-colors">Support</Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          </nav>
+          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-aurora-cyan animate-pulse-glow" />Built on Stellar</span>
+        </div>
+      </footer>
     </div>
   );
 }

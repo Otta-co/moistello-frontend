@@ -10,10 +10,14 @@ export default function NotFound() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="container-premium max-w-xl mx-auto px-4">
           <div className="rounded-3xl bg-card/60 backdrop-blur-xl border border-white/10 p-10 text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-aurora-violet/15 mb-6">
-              <FileQuestion className="h-10 w-10 text-aurora-violet" />
+            <div className="flex items-center justify-center mb-6">
+              <div className="flex items-baseline gap-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-aurora-violet/15">
+                  <FileQuestion className="h-8 w-8 text-aurora-violet" />
+                </div>
+                <h1 className="font-heading text-5xl md:text-6xl font-black text-foreground">404</h1>
+              </div>
             </div>
-            <h1 className="font-heading text-5xl md:text-6xl font-black mb-4 text-foreground">404</h1>
             <h2 className="font-heading text-2xl font-semibold mb-3 text-foreground">Page Not Found</h2>
             <p className="text-muted-foreground mb-8 leading-relaxed">
               The page you&apos;re looking for doesn&apos;t exist. It might have been moved, deleted, or never existed.

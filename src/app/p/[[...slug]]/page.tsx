@@ -224,16 +224,6 @@ export default function UploadedPage({ params }: { params: { slug?: string[] } }
             </main>
           </div>
         </div>
-        <footer className="glass mt-20 py-8 border-t border-border">
-          <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Moistello</span>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <Link href="/p" className="hover:text-foreground">Pages</Link>
-              <Link href="/docs" className="hover:text-foreground">Docs</Link>
-              <Link href="/about" className="hover:text-foreground">About</Link>
-            </nav>
-          </div>
-        </footer>
       </div>
     </PublicLayout>
   );

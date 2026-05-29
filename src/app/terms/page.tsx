@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PublicLayout } from "@/components/layout/public-layout";
 
 export const metadata = { title: "Terms of Service - Moistello" };
@@ -28,16 +27,6 @@ export default function TermsPage() {
             ))}
           </div>
         </div>
-        <footer className="glass mt-20 py-8 border-t border-border">
-          <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Moistello</span>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <Link href="/about" className="hover:text-foreground">About</Link>
-              <Link href="/terms" className="hover:text-foreground">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            </nav>
-          </div>
-        </footer>
       </div>
     </PublicLayout>
   );

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PublicLayout } from "@/components/layout/public-layout";
 
 export const metadata = {
@@ -32,19 +31,6 @@ export default function AboutPage() {
             </div>
           </div>
         </main>
-        <footer className="glass mt-20 py-8 border-t border-border">
-          <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Moistello</span>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
-              <Link href="/how-it-works" className="hover:text-foreground transition-colors">How It Works</Link>
-              <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
-              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            </nav>
-            <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-aurora-cyan animate-pulse-glow" />Built on Stellar</span>
-          </div>
-        </footer>
       </div>
     </PublicLayout>
   );

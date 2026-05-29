@@ -76,7 +76,7 @@ function parseFrontmatter(file: string): { title: string; order: number; content
 
 function getDocsList(): { slug: string; title: string; order: number }[] {
   if (!fs.existsSync(DOCS_DIR)) return [];
-  return fs.readdirSync(DOCS_DIR)
+  const docs = fs.readdirSync(DOCS_DIR)
     .filter(f => f.endsWith('.md'))
     .map(f => {
       const raw = fs.readFileSync(path.join(DOCS_DIR, f), 'utf-8');
@@ -84,6 +84,8 @@ function getDocsList(): { slug: string; title: string; order: number }[] {
       return { slug: f.replace(/\.md$/, ''), title: title || f.replace(/\.md$/, ''), order };
     })
     .sort((a, b) => a.order - b.order);
+  docs.push({ slug: "api", title: "API Reference", order: 100 });
+  return docs;
 }
 
 // ── Page Component ──
@@ -148,15 +150,6 @@ export default function DocsPage({ params }: { params: { slug?: string[] } }) {
             </main>
           </div>
         </div>
-        <footer className="glass mt-20 py-8 border-t border-border">
-          <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Moistello</span>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <Link href="/docs" className="hover:text-foreground">Docs</Link>
-              <Link href="/about" className="hover:text-foreground">About</Link>
-            </nav>
-          </div>
-        </footer>
       </div>
     </PublicLayout>
   );

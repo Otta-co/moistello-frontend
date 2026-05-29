@@ -37,18 +37,6 @@ export default function FAQPage() {
             <Link href="/login" className="gradient-bg-premium h-10 px-6 rounded-xl text-white font-heading font-semibold inline-flex items-center gap-2">Get Started</Link>
           </div>
         </div>
-        <footer className="glass mt-20 py-8 border-t border-border">
-          <div className="container-premium flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Moistello</span>
-            <nav className="flex flex-wrap justify-center gap-6">
-              <Link href="/about" className="hover:text-foreground">About</Link>
-              <Link href="/how-it-works" className="hover:text-foreground">How It Works</Link>
-              <Link href="/faq" className="hover:text-foreground">FAQ</Link>
-              <Link href="/terms" className="hover:text-foreground">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            </nav>
-          </div>
-        </footer>
       </div>
     </PublicLayout>
   );
