@@ -19,11 +19,6 @@ Allow: /developers
 Allow: /support
 Allow: /status
 Allow: /terms
-Allow: /not-found
-Allow: /internal-error
-Allow: /access-denied
-Allow: /auth-required
-Allow: /bad-request
 
 Disallow: /_next/
 Disallow: /api/
