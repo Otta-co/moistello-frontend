@@ -17,6 +17,7 @@ Allow: /privacy
 Allow: /how-it-works
 Allow: /developers
 Allow: /support
+Allow: /status
 Allow: /terms
 
 Disallow: /_next/
