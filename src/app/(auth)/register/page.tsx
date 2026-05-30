@@ -175,7 +175,8 @@ export default function RegisterPage() {
             setWc2PairingState("awaiting_approval")
           })
           await connect("walletconnect")
-          setWc2PairingState("approved")
+          // Connection approval is handled by the session event handler
+          // State will be updated when user approves via wallet
         } catch (err: unknown) {
           const message =
             err instanceof Error ? err.message : "Connection failed"
@@ -192,7 +193,6 @@ export default function RegisterPage() {
           )
           setOnPairingUri(null)
         }
-        setIsWc2Active(false)
         return
       }
 

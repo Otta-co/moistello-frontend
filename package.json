@@ -29,6 +29,7 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.14.0",
     "next": "14.2.35",
+    "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",

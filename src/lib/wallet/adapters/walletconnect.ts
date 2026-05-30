@@ -183,6 +183,7 @@ export function createWalletConnectAdapter(): WalletAdapter {
     reject: (reason: unknown) => void,
     getSettled: () => boolean,
     setSettled: () => void,
+    startTime: number,
   ) {
     signClient.on("session_proposal", async (proposal: unknown) => {
       if (getSettled()) return
@@ -197,11 +198,9 @@ export function createWalletConnectAdapter(): WalletAdapter {
 
         const namespaces: Record<string, Record<string, unknown>> = {}
         for (const [key, ns] of Object.entries(requiredNamespaces || {})) {
-          const nsObj = ns as { chains?: string[] }
-          const chains = nsObj.chains || []
+          const nsObj = ns as { chains?: string[]; methods?: string[]; events?: string[] }
           namespaces[key] = {
             ...nsObj,
-            accounts: chains.map((chain: string) => `${chain}:${connectedPublicKey ?? ""}`),
           }
         }
 
@@ -234,6 +233,8 @@ export function createWalletConnectAdapter(): WalletAdapter {
             connectedPublicKey = pubKey
             connectedNetwork = networkFromChainId(account.split(":")[1])
             setSettled()
+            const relay = getRelayMonitor()
+            relay.recordOutcome(true, performance.now() - startTime)
             wcSignClient = signClient
             getWC2SessionStore().saveSession({
               pairingTopic: session.topic,
@@ -279,27 +280,15 @@ export function createWalletConnectAdapter(): WalletAdapter {
       }
 
       const startTime = performance.now()
-
       const signClient = await getOrInitSignClient()
 
-      return new Promise<{ publicKey: string }>((resolve, reject) => {
-        let settled = false
-        const getSettled = () => settled
-        const setSettled = () => {
-          settled = true
-        }
+      let settled = false
+      const getSettled = () => settled
+      const setSettled = () => {
+        settled = true
+      }
 
-        // Handle session deletion during connection attempt
-        const cleanupSession = () => {
-          ;(signClient as { on: (event: string, handler: (...args: unknown[]) => void) => void }).on("session_delete", (topic: unknown) => {
-            if (!getSettled() && topic === sessionTopic) {
-              setSettled()
-              reject(createRejectedError("walletconnect"))
-            }
-          })
-        }
-        cleanupSession()
-
+      const connectionPromise = new Promise<{ publicKey: string }>((resolve, reject) => {
         createSessionHandler(
           signClient as {
             on: (event: string, handler: (...args: unknown[]) => void) => void
@@ -310,143 +299,71 @@ export function createWalletConnectAdapter(): WalletAdapter {
           reject,
           getSettled,
           setSettled,
+          startTime,
         )
-
-        const connectPromise = (signClient as { connect: (opts: Record<string, unknown>) => Promise<{ uri?: string; approval?: () => Promise<unknown> }> }).connect({
-          requiredNamespaces: {
-            stellar: {
-              methods: ["stellar_signAndSubmitXDR", "stellar_signXDR"],
-              chains: ["stellar:testnet", "stellar:pubnet"],
-              events: [],
-            },
-          },
-        })
-
-        const connectTimeout = new Promise<never>((_, rejectTimeout) => {
-          setTimeout(() => {
-            if (!getSettled()) {
-              setSettled()
-              relay.recordOutcome(false, performance.now() - startTime)
-              rejectTimeout(createTimeoutError("walletconnect", CONNECT_TIMEOUT))
-            }
-          }, CONNECT_TIMEOUT)
-        })
-
-        Promise.race([connectPromise, connectTimeout])
-          .then(async (result) => {
-            const { uri, approval } = result as { uri?: string; approval?: () => Promise<unknown> }
-
-            if (!uri) {
-              if (!getSettled()) {
-                setSettled()
-                reject(createInternalError("walletconnect", "No pairing URI generated", "WC2 connect returned no URI"))
-              }
-              return
-            }
-
-            // Handle proposal expiration
-            if (!getSettled()) {
-              ;(signClient as { on: (event: string, handler: (...args: unknown[]) => void) => void }).on("proposal_expire", () => {
-                if (!getSettled()) {
-                  setSettled()
-                  relay.recordOutcome(false, performance.now() - startTime)
-                  reject(createTimeoutError("walletconnect", CONNECT_TIMEOUT))
-                }
-              })
-            }
-
-            if (_onPairingUri) {
-              _onPairingUri(uri)
-              if (approval) {
-                try {
-                  const session = await approval()
-                  const s = session as {
-                    topic?: string
-                    namespaces?: Record<string, { accounts: string[] }>
-                  }
-                  if (s?.topic) {
-                    sessionTopic = s.topic
-                  }
-                  const stellar = s?.namespaces?.stellar
-                  const accounts = stellar?.accounts
-                  if (accounts && accounts.length > 0) {
-                    const account = accounts[0]
-                    const pubKey = account.split(":")[2]
-                    if (pubKey && isValidStellarPublicKey(pubKey)) {
-                      connectedPublicKey = pubKey
-                      connectedNetwork = networkFromChainId(account.split(":")[1])
-                      setSettled()
-                      relay.recordOutcome(true, performance.now() - startTime)
-                      getWC2SessionStore().saveSession({
-                        pairingTopic: sessionTopic!,
-                        publicKey: pubKey,
-                        network: connectedNetwork,
-                        createdAt: Date.now(),
-                        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
-                      })
-                      resolve({ publicKey: pubKey })
-                      return
-                    }
-                  }
-                  if (!getSettled()) {
-                    setSettled()
-                    reject(
-                      createInternalError("walletconnect", "Could not extract public key from session", "No stellar account in namespace"),
-                    )
-                  }
-                } catch (approveErr: unknown) {
-                  if (!getSettled()) {
-                    setSettled()
-                    const err = approveErr as { code?: number; message?: string }
-                    if (err?.code === 5001 || err?.message?.includes("rejected") || err?.message?.includes("cancelled")) {
-                      reject(createRejectedError("walletconnect"))
-                    } else {
-                      reject(createInternalError("walletconnect", "Session approval failed", String(approveErr)))
-                    }
-                  }
-                }
-              }
-              return
-            }
-
-            relay.recordOutcome(true, performance.now() - startTime)
-
-            if (PROJECT_ID) {
-              try {
-                const { WalletConnectModal } = await import("@walletconnect/modal")
-                const wcModal = new WalletConnectModal({
-                  projectId: PROJECT_ID,
-                  themeMode: "dark",
-                })
-                // Track modal close for analytics only — let protocol events handle rejection
-                wcModal.subscribeModal((state: { open: boolean }) => {
-                  if (!state.open && !getSettled()) {
-                    // Modal closed before connection - user may retry
-                    // Do NOT reject here; session_proposal or proposal_expire will handle it
-                  }
-                })
-                wcModal.openModal({ uri })
-              } catch {
-                // Fallback to universal link if modal fails
-                window.open(`https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`, "_blank")
-              }
-            } else {
-              if (isBrowser()) {
-                window.open(`https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`, "_blank")
-              }
-            }
-          })
-          .catch((err: unknown) => {
-            relay.recordOutcome(false, performance.now() - startTime)
-            if (!getSettled()) {
-              setSettled()
-              const e = err as { code?: string; message?: string }
-              reject(
-                createInternalError("walletconnect", e?.message ?? "Failed to initiate WalletConnect connection", String(err)),
-              )
-            }
-          })
       })
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          if (!getSettled()) {
+            setSettled()
+            relay.recordOutcome(false, performance.now() - startTime)
+            reject(createTimeoutError("walletconnect", CONNECT_TIMEOUT))
+          }
+        }, CONNECT_TIMEOUT)
+      })
+
+      ;(signClient as { connect: (opts: Record<string, unknown>) => Promise<{ uri?: string }> }).connect({
+        requiredNamespaces: {
+          stellar: {
+            methods: ["stellar_signAndSubmitXDR", "stellar_signXDR"],
+            chains: ["stellar:testnet", "stellar:pubnet"],
+            events: [],
+          },
+        },
+      })
+        .then((result) => {
+          const { uri } = result as { uri?: string }
+
+          if (!uri) {
+            if (!getSettled()) {
+              setSettled()
+            }
+            return
+          }
+
+          if (_onPairingUri) {
+            _onPairingUri(uri)
+          }
+
+          // Desktop: open modal to let user choose wallet
+          // The session_proposal handler will auto-approve when wallet proposes
+          if (isBrowser() && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            if (PROJECT_ID) {
+              ;(async () => {
+                try {
+                  const { WalletConnectModal } = await import("@walletconnect/modal")
+                  const wcModal = new WalletConnectModal({
+                    projectId: PROJECT_ID,
+                    themeMode: "dark",
+                  })
+                  wcModal.openModal({ uri })
+                } catch {
+                  window.open(`https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`, "_blank")
+                }
+              })()
+            } else {
+              window.open(`https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`, "_blank")
+            }
+          }
+        })
+        .catch(() => {
+          if (!getSettled()) {
+            setSettled()
+          }
+        })
+
+      return Promise.race([connectionPromise, timeoutPromise])
     },
 
     async disconnect(): Promise<void> {

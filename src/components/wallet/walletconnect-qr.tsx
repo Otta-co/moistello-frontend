@@ -165,6 +165,15 @@ export function WalletConnectQR({
         <li>3. Scan this code to connect</li>
       </ol>
 
+      {uri && (
+        <div className="w-full max-w-xs">
+          <p className="text-xs text-muted-foreground mb-2 text-center">Or use this link:</p>
+          <code className="block truncate rounded-lg bg-white/5 px-3 py-2 text-xs font-mono text-muted-foreground border border-white/10">
+            {uri.slice(0, 40)}...
+          </code>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <button
           type="button"

@@ -1,5 +1,5 @@
 import { getWalletRegistry } from "../registry"
-import { isPasskeyEnabled, isHardwareWalletEnabled } from "../features"
+import { isPasskeyEnabled, isHardwareWalletEnabled, isWalletConnectEnabled } from "../features"
 
 export { createWalletConnectAdapter } from "./walletconnect"
 export { createPasskeyAdapter } from "./passkey"
@@ -15,9 +15,11 @@ export async function initializeWalletAdapters(): Promise<void> {
   if (initialized) return
   const registry = getWalletRegistry()
 
-  // WalletConnect always available (no flag needed — it's the universal option)
-  const { createWalletConnectAdapter } = await import("./walletconnect")
-  registry.register(createWalletConnectAdapter())
+// WalletConnect: gated by feature flag
+   if (isWalletConnectEnabled()) {
+     const { createWalletConnectAdapter } = await import("./walletconnect")
+     registry.register(createWalletConnectAdapter())
+   }
 
   // Passkey: gated by feature flag
   if (isPasskeyEnabled()) {
