@@ -7,8 +7,8 @@ const RELAY_URL = "wss://relay.walletconnect.com"
 const METADATA = {
   name: "Moistello",
   description: "Decentralized savings circles on Stellar",
-  url: "https://moistello.io",
-  icons: ["https://moistello.io/icon.png"],
+  url: "https://moistello.com",
+  icons: ["https://moistello.com/logo.jpg"],
 }
 
 const SIGN_TIMEOUT = 60_000
