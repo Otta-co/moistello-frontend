@@ -20,9 +20,9 @@ export const metadata: Metadata = {
     siteName: "Moistello",
     title: "Moistello — Decentralized Savings Circles on Stellar",
     description: "Join trustless savings circles with zero intermediaries. Built on Stellar for true financial sovereignty.",
-    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Moistello - Stellar Savings Platform" }],
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Moistello - Decentralized Stellar Savings Platform" }],
   },
-  twitter: { card: "summary_large_image", title: "Moistello — Stellar Savings Circles", description: "Decentralized rotating savings on Stellar. Save together. Grow together.", images: ["/logo.jpg"] },
+  twitter: { card: "summary_large_image", title: "Moistello — Stellar Savings Circles", description: "Build trustless savings circles on Stellar. Join rotating credit groups with USDC/XLM, earn on-chain reputation, and achieve financial sovereignty.", images: ["/logo.jpg"] },
 }
 
 const features = [
