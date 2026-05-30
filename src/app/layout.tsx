@@ -29,7 +29,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Moistello — Stellar Savings Circles",
-  description: "Decentralized rotating savings and credit circles on the Stellar blockchain. Save together. Grow together.",
+  description: "Decentralized rotating savings and credit circles on Stellar. Join trustless ROSCAs with USDC/XLM, build MoiScore reputation, and achieve financial freedom.",
   keywords: "moistello, stellar, blockchain, savings circles, defi, decentralized finance, rotating credit, USDC, XLM, smart contracts, soroban",
   authors: [{ name: "Nekwachukwu Ucheokoye" }],
   creator: "Nekwachukwu Ucheokoye",
@@ -49,10 +49,10 @@ export const metadata: Metadata = {
     url: "https://moistello.com",
     siteName: "Moistello",
     title: "Moistello — Decentralized Savings Circles on Stellar",
-    description: "Join trustless savings circles with zero intermediaries. Built on Stellar blockchain for true financial sovereignty.",
+    description: "Join trustless savings circles with zero intermediaries. Built on Stellar for true financial sovereignty and on-chain reputation.",
     images: [
       {
-        url: "/logo.png",
+        url: "/logo.jpg",
         width: 1200,
         height: 630,
         alt: "Moistello - Decentralized Stellar Savings Platform",
@@ -65,12 +65,7 @@ export const metadata: Metadata = {
     creator: "@nekwasar",
     title: "Moistello — Stellar Savings Circles",
     description: "Build trustless savings circles on Stellar. Join rotating credit groups with USDC/XLM, earn on-chain reputation, and achieve financial sovereignty.",
-    images: ["/logo.png"],
-  },
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+    images: ["/logo.jpg"],
   },
   icons: {
     icon: "/favicon.ico",

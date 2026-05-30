@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     url: "https://moistello.com/how-it-works",
     siteName: "Moistello",
     title: "How Moistello Savings Circles Work - Complete Guide",
-    description: "Step-by-step guide to Stellar savings circles. Connect wallet, create circle, contribute USDC/XLM, receive payouts, and build MoiScore reputation.",
+    description: "Step-by-step guide to Stellar savings circles. Connect wallet, create circle, contribute USDC/XLM, receive payouts, and build MoiScore on-chain reputation.",
     images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "How Moistello Works - Step by Step Guide" }],
   },
   twitter: { card: "summary_large_image", title: "How It Works - Moistello", description: "Learn how to join trustless savings circles on Stellar in 5 simple steps.", images: ["/logo.jpg"] },
