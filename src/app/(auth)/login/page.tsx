@@ -51,7 +51,6 @@ export default function LoginPage() {
 
   const connect = useMultiWalletStore((s) => s.connect)
   const isConnecting = useMultiWalletStore((s) => s.isConnecting)
-  const error = useMultiWalletStore((s) => s.error)
   const address = useMultiWalletStore((s) => s.address)
   const isConnected = useMultiWalletStore((s) => s.isConnected)
   const activeAdapter = useMultiWalletStore((s) => s.activeAdapter)
@@ -66,6 +65,9 @@ export default function LoginPage() {
   const setWc2PairingState = useMultiWalletStore((s) => s.setWc2PairingState)
   const setWc2PairingError = useMultiWalletStore((s) => s.setWc2PairingError)
   const resetWc2Pairing = useMultiWalletStore((s) => s.resetWc2Pairing)
+  const loginError = useMultiWalletStore((s) => s.loginError)
+  const setLoginError = useMultiWalletStore((s) => s.setLoginError)
+  const clearLoginError = useMultiWalletStore((s) => s.clearLoginError)
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const login = useAuthStore((s) => s.login)
@@ -82,7 +84,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     useMultiWalletStore.getState().scanWallets()
-  }, [])
+    clearLoginError()
+    resetWc2Pairing()
+  }, [clearLoginError, resetWc2Pairing])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -191,6 +195,7 @@ export default function LoginPage() {
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Connection failed"
+        setLoginError(message)
         addToast({
           type: "error",
           title: "Connection Failed",
@@ -198,7 +203,7 @@ export default function LoginPage() {
         })
       }
     },
-    [detectedWallets, connect, setWc2PairingUri, setWc2PairingState, setWc2PairingError, addToast],
+    [detectedWallets, connect, setWc2PairingUri, setWc2PairingState, setWc2PairingError, addToast, setLoginError],
   )
 
   const handleWc2Cancel = useCallback(() => {
@@ -507,12 +512,12 @@ export default function LoginPage() {
               )}
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2 text-sm text-red-400">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
+{loginError && (
+               <div className="flex items-start gap-2 text-sm text-red-400">
+                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                 <span>{loginError}</span>
+               </div>
+             )}
 
             {extensionWallets.filter((w) => w.status === "detected")
               .length === 0 && !hasPasskey && !hasWalletConnect && !hasLedger && (

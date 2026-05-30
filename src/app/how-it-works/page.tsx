@@ -1,8 +1,28 @@
-import Link from "next/link";
-import { PublicLayout } from "@/components/layout/public-layout";
-import { Dices, ListOrdered, Gavel, Vote } from "lucide-react";
+import Link from "next/link"
+import { Metadata } from "next"
+import { PublicLayout } from "@/components/layout/public-layout"
+import { Dices, ListOrdered, Gavel, Vote } from "lucide-react"
 
-export const metadata = { title: "How It Works - Moistello" };
+export const metadata: Metadata = {
+  title: "How It Works - Moistello",
+  description: "Learn how Moistello's decentralized savings circles work. Connect wallet, create/join circles, contribute, receive payouts, and build on-chain reputation on Stellar.",
+  keywords: "moistello, stellar, savings circles, how it works, wallet connect, contribute, payout, reputation, MoiScore, USDC, XLM, Soroban, ROSCA, tontine",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/how-it-works" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/how-it-works",
+    siteName: "Moistello",
+    title: "How Moistello Savings Circles Work - Complete Guide",
+    description: "Step-by-step guide to Stellar savings circles. Connect wallet, create circle, contribute USDC/XLM, receive payouts, and build MoiScore reputation.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "How Moistello Works - Step by Step Guide" }],
+  },
+  twitter: { card: "summary_large_image", title: "How It Works - Moistello", description: "Learn how to join trustless savings circles on Stellar in 5 simple steps.", images: ["/logo.jpg"] },
+}
 
 const steps = [
   { num: "01", title: "Connect Your Wallet", desc: "Install Freighter, create or import a Stellar wallet, and connect. No email or password required." },
@@ -10,14 +30,14 @@ const steps = [
   { num: "03", title: "Contribute Each Cycle", desc: "You and all members contribute USDC or XLM each cycle. Smart contracts track every payment on-chain." },
   { num: "04", title: "Receive Your Payout", desc: "Each cycle, one member gets the full pool. Order: random, fixed, auction, or vote-based." },
   { num: "05", title: "Build Your Reputation", desc: "Every on-time payment builds your MoiScore (0-1000). Higher scores unlock larger circles and better terms." },
-];
+]
 
 const payoutTypes = [
   { icon: Dices, title: "Random", desc: "Smart contract VRF selects payout order. Fair and unpredictable." },
   { icon: ListOrdered, title: "Fixed Order", desc: "Organizer defines payout order upfront. Full transparency." },
   { icon: Gavel, title: "Auction (Chit Fund)", desc: "Members bid discount amounts. Lowest bidder wins, discount shared among all." },
   { icon: Vote, title: "Vote-Based", desc: "Members vote each round on who receives payout. Community-driven." },
-];
+]
 
 export default function HowItWorksPage() {
   return (

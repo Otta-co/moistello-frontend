@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Metadata } from "next"
 import { PublicLayout } from "@/components/layout/public-layout"
 import {
   BookOpen,
@@ -17,6 +18,27 @@ import {
   Package,
   Mail,
 } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "Developers - Moistello",
+  description: "Moistello developer platform. Build on Stellar with our complete API documentation, 27 endpoints, 7 Soroban contracts, and open-source tools for decentralized savings.",
+  keywords: "moistello, developers, API, stellar, soroban, smart contracts, open source, typescript, react, rest API, blockchain",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/developers" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/developers",
+    siteName: "Moistello",
+    title: "Developers - Moistello",
+    description: "Build decentralized savings on Stellar. Full API documentation, smart contracts, and resources for developers.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Developers - Moistello" }],
+  },
+  twitter: { card: "summary_large_image", title: "Developers - Moistello", description: "Build on Moistello's Stellar savings platform.", images: ["/logo.jpg"] },
+}
 
 const apiEndpoints = [
   {

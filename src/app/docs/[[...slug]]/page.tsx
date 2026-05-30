@@ -1,11 +1,59 @@
 import fs from "fs";
 import path from "path";
 import Link from "next/link";
+import { Metadata } from "next";
 import { PublicLayout } from "@/components/layout/public-layout";
 
 const DOCS_DIR = path.join(process.cwd(), "content/docs");
 
-// ── Tiny Markdown Parser (zero dependencies) ──
+function parseFrontmatter(file: string): { title: string; order: number; content: string } {
+  const parts = file.split('---\n');
+  if (parts.length < 3) return { title: '', order: 999, content: file };
+  const meta: Record<string, string> = {};
+  parts[1].split('\n').forEach(line => {
+    const [key, ...rest] = line.split(':');
+    if (key) meta[key.trim()] = rest.join(':').trim();
+  });
+  return {
+    title: meta.title || '',
+    order: parseInt(meta.order || '999'),
+    content: parts.slice(2).join('---\n').trim(),
+  };
+}
+
+export async function generateMetadata({ params }: { params: { slug?: string[] } }): Promise<Metadata> {
+  const slug = params.slug && params.slug.length > 0 ? params.slug.join("/") : "index";
+  const filePath = path.join(DOCS_DIR, `${slug}.md`);
+
+  if (!fs.existsSync(filePath)) {
+    return { title: "Doc Not Found — Moistello" };
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const { title } = parseFrontmatter(raw);
+
+  return {
+    title: title ? `${title} — Moistello` : `Documentation — Moistello`,
+    description: "Moistello documentation. Learn about Stellar savings circles, USDC contributions, MoiScore reputation, and smart contracts.",
+    keywords: "moistello, documentation, stellar, savings circles, USDC, MoiScore, smart contracts, soroban, ROSCA",
+    authors: [{ name: "Nekwachukwu Ucheokoye" }],
+    creator: "Moistello",
+    publisher: "Moistello",
+    alternates: { canonical: `/docs/${slug === "index" ? "" : slug}` },
+    robots: { index: true, follow: true },
+    openGraph: {
+      type: "article",
+      locale: "en_US",
+      url: `https://moistello.com/docs/${slug === "index" ? "" : slug}`,
+      siteName: "Moistello",
+      title: title || "Documentation",
+      description: "Moistello documentation for Stellar savings circles.",
+      images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Moistello Documentation" }],
+    },
+    twitter: { card: "summary_large_image", title: title || "Documentation", description: "Moistello docs for Stellar savings circles.", images: ["/logo.jpg"] },
+  };
+}
+
 function mdToHtml(md: string): string {
   let html = md;
   // Code blocks (fenced)
@@ -56,22 +104,6 @@ function mdToHtml(md: string): string {
     return `<p class="text-muted-foreground leading-relaxed mb-4">${p}</p>`;
   });
   return paras.join('\n');
-}
-
-// ── Frontmatter Parser (zero dependencies) ──
-function parseFrontmatter(file: string): { title: string; order: number; content: string } {
-  const parts = file.split('---\n');
-  if (parts.length < 3) return { title: '', order: 999, content: file };
-  const meta: Record<string, string> = {};
-  parts[1].split('\n').forEach(line => {
-    const [key, ...rest] = line.split(':');
-    if (key) meta[key.trim()] = rest.join(':').trim();
-  });
-  return {
-    title: meta.title || '',
-    order: parseInt(meta.order || '999'),
-    content: parts.slice(2).join('---\n').trim(),
-  };
 }
 
 function getDocsList(): { slug: string; title: string; order: number }[] {

@@ -1,7 +1,29 @@
+import { Metadata } from "next"
 import Link from "next/link";
 import { Shield, Globe, Award, Zap, Shuffle, Coins, ArrowRight } from "lucide-react";
 import { Routes } from "@/lib/constants";
 import { PublicLayout } from "@/components/layout/public-layout";
+
+export const metadata: Metadata = {
+  title: "Moistello — Stellar Savings Circles",
+  description: "Decentralized savings circles on Stellar blockchain. Join trustless ROSCAs with USDC/XLM, build MoiScore reputation, and access financial tools for the unbanked.",
+  keywords: "moistello, stellar, savings circles, ROSCA, tontine, esusu, USDC, XLM, MoiScore, reputation, soroban, smart contracts, financial inclusion, unbanked",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com",
+    siteName: "Moistello",
+    title: "Moistello — Decentralized Savings Circles on Stellar",
+    description: "Join trustless savings circles with zero intermediaries. Built on Stellar for true financial sovereignty.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Moistello - Stellar Savings Platform" }],
+  },
+  twitter: { card: "summary_large_image", title: "Moistello — Stellar Savings Circles", description: "Decentralized rotating savings on Stellar. Save together. Grow together.", images: ["/logo.jpg"] },
+}
 
 const features = [
   {

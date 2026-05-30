@@ -1,5 +1,27 @@
+import { Metadata } from "next"
 import { PublicLayout } from "@/components/layout/public-layout"
 import { ContributionForm } from "./contribution-form"
+
+export const metadata: Metadata = {
+  title: "Become a Contributor - Moistello",
+  description: "Join Moistello's mission to build financial inclusion tools. We welcome developers, designers, writers, and community builders. Apply to contribute to the Stellar savings platform.",
+  keywords: "moistello, contribute, open source, stellar, blockchain, developer, contributor, financial inclusion, soroban, typescript, react",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/become-a-contributor" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/become-a-contributor",
+    siteName: "Moistello",
+    title: "Become a Contributor - Join Moistello's Mission",
+    description: "Build financial inclusion on Stellar. Apply to contribute to decentralized savings circles as developer, designer, or writer.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Become a Contributor - Moistello" }],
+  },
+  twitter: { card: "summary_large_image", title: "Become a Contributor - Moistello", description: "Join our mission building decentralized savings on Stellar. Developers and builders welcome.", images: ["/logo.jpg"] },
+}
 
 export default function BecomeAContributorPage() {
   return (
@@ -41,18 +63,18 @@ export default function BecomeAContributorPage() {
               </div>
 
 <div className="space-y-6">
-                 {whyContribute.map((item) => (
-                   <div key={item.title} className="flex gap-3">
-                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 shrink-0">
-                       {<item.icon className="h-5 w-5 text-muted-foreground" />}
-                     </span>
-                     <div>
-                       <p className="text-sm font-medium text-foreground mb-1">{item.title}</p>
-                       <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                     </div>
-                   </div>
-                 ))}
-               </div>
+                {whyContribute.map((item) => (
+                  <div key={item.title} className="flex gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 shrink-0">
+                      {<item.icon className="h-5 w-5 text-muted-foreground" />}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-1">{item.title}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* RIGHT: Application Form */}
@@ -90,13 +112,13 @@ export default function BecomeAContributorPage() {
                 <h2 className="font-heading text-base font-semibold text-foreground">Why Contribute?</h2>
               </div>
 <div className="space-y-3 text-sm">
-                 {whyContribute.slice(0, 3).map((item) => (
-                   <div key={item.title} className="flex items-center gap-2">
-                     {<item.icon className="h-4 w-4 text-muted-foreground" />}
-                     <span className="text-foreground">{item.title}</span>
-                   </div>
-                 ))}
-               </div>
+                {whyContribute.slice(0, 3).map((item) => (
+                  <div key={item.title} className="flex items-center gap-2">
+                    {<item.icon className="h-4 w-4 text-muted-foreground" />}
+                    <span className="text-foreground">{item.title}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>

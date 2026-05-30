@@ -1,7 +1,27 @@
-import Link from "next/link";
-import { PublicLayout } from "@/components/layout/public-layout";
+import Link from "next/link"
+import { Metadata } from "next"
+import { PublicLayout } from "@/components/layout/public-layout"
 
-export const metadata = { title: "FAQ - Moistello" };
+export const metadata: Metadata = {
+  title: "FAQ - Moistello",
+  description: "Frequently asked questions about Moistello savings circles, Stellar wallet setup, USDC contributions, MoiScore reputation, and platform fees.",
+  keywords: "moistello, stellar, savings circles, FAQ, questions, wallet, USDC, XLM, MoiScore, reputation, smart contracts",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/faq" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/faq",
+    siteName: "Moistello",
+    title: "Moistello FAQ - All Questions Answered",
+    description: "Answers to common questions about savings circles, wallet connection, USDC/XLM, MoiScore reputation, and platform security on Stellar.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Moistello FAQ - Questions Answered" }],
+  },
+  twitter: { card: "summary_large_image", title: "FAQ - Moistello", description: "All answers about Moistello savings circles, Stellar wallet, and MoiScore reputation.", images: ["/logo.jpg"] },
+}
 
 const faqs = [
   { q: "What is a savings circle (ROSCA)?", a: "A Rotating Savings and Credit Association is a group who contribute a fixed amount regularly. Each cycle, one member receives the total pool. Known worldwide as esusu, tontine, chit fund, tanda, and hui." },
@@ -11,8 +31,7 @@ const faqs = [
   { q: "What if someone doesn't pay?", a: "Late payments incur a configurable penalty (default 5%). After max strikes (default 3), the member is removed. Collateralized circles: staked funds can be slashed." },
   { q: "What is MoiScore?", a: "Your on-chain reputation (0-1000) built from streak, completions, volume, and recency. High scores unlock larger circles and lower collateral." },
   { q: "Is it free?", a: "0.5% protocol fee on payouts. Stellar network fees &lt; $0.001 per transaction. No fees to create/join circles." },
-  { q: "What is Drips Wave?", a: "A recurring bounty program by the Stellar Development Foundation rewarding open-source contributors. Moistello participates with scoped issues and point rewards." },
-];
+]
 
 export default function FAQPage() {
   return (

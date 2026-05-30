@@ -95,7 +95,6 @@ export default function RegisterPage() {
 
   const connect = useMultiWalletStore((s) => s.connect)
   const isConnecting = useMultiWalletStore((s) => s.isConnecting)
-  const error = useMultiWalletStore((s) => s.error)
   const address = useMultiWalletStore((s) => s.address)
   const activeAdapter = useMultiWalletStore((s) => s.activeAdapter)
   const detectedWallets = useMultiWalletStore((s) => s.detectedWallets)
@@ -110,6 +109,9 @@ export default function RegisterPage() {
   const setWc2PairingState = useMultiWalletStore((s) => s.setWc2PairingState)
   const setWc2PairingError = useMultiWalletStore((s) => s.setWc2PairingError)
   const resetWc2Pairing = useMultiWalletStore((s) => s.resetWc2Pairing)
+  const registerError = useMultiWalletStore((s) => s.registerError)
+  const setRegisterError = useMultiWalletStore((s) => s.setRegisterError)
+  const clearRegisterError = useMultiWalletStore((s) => s.clearRegisterError)
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const isLoading = useAuthStore((s) => s.isLoading)
@@ -132,7 +134,9 @@ export default function RegisterPage() {
 
   useEffect(() => {
     useMultiWalletStore.getState().scanWallets()
-  }, [])
+    clearRegisterError()
+    resetWc2Pairing()
+  }, [clearRegisterError, resetWc2Pairing])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -196,6 +200,7 @@ export default function RegisterPage() {
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Connection failed"
+        setRegisterError(message)
         addToast({
           type: "error",
           title: "Connection Failed",
@@ -203,7 +208,7 @@ export default function RegisterPage() {
         })
       }
     },
-    [detectedWallets, connect, setWc2PairingUri, setWc2PairingState, setWc2PairingError, addToast],
+    [detectedWallets, connect, setWc2PairingUri, setWc2PairingState, setWc2PairingError, addToast, setRegisterError],
   )
 
   const handleWc2Cancel = useCallback(() => {
@@ -590,12 +595,12 @@ export default function RegisterPage() {
                     )}
                   </div>
 
-                  {error && (
-                    <div className="flex items-start gap-2 text-sm text-red-400">
-                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>{error}</span>
-                    </div>
-                  )}
+{registerError && (
+                     <div className="flex items-start gap-2 text-sm text-red-400">
+                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                       <span>{registerError}</span>
+                     </div>
+                   )}
 
                   {extensionWallets.filter((w) => w.status === "detected")
                     .length === 0 && !hasPasskey && !hasWalletConnect && !hasLedger && (
@@ -679,12 +684,12 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              {error && (
-                <div className="flex items-start gap-2 text-sm text-red-400">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
+{registerError && (
+                 <div className="flex items-start gap-2 text-sm text-red-400">
+                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                   <span>{registerError}</span>
+                 </div>
+               )}
 
               <button
                 onClick={handlePasskeyCreate}

@@ -1,6 +1,26 @@
-import { PublicLayout } from "@/components/layout/public-layout";
+import { Metadata } from "next"
+import { PublicLayout } from "@/components/layout/public-layout"
 
-export const metadata = { title: "Terms of Service - Moistello" };
+export const metadata: Metadata = {
+  title: "Terms of Service - Moistello",
+  description: "Moistello Terms of Service. Legal agreement covering smart contract risks, liability limitations, eligibility, and user responsibilities for the Stellar savings platform.",
+  keywords: "moistello, terms, service, legal, agreement, stellar, smart contracts, liability, ROSCA, soroban",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/terms" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/terms",
+    siteName: "Moistello",
+    title: "Terms of Service - Moistello",
+    description: "Legal terms for using Moistello's decentralized savings circles on Stellar. Covers smart contract risks and user responsibilities.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Terms of Service - Moistello" }],
+  },
+  twitter: { card: "summary_large_image", title: "Terms of Service - Moistello", description: "Terms for using Moistello savings circles on Stellar blockchain.", images: ["/logo.jpg"] },
+}
 
 export default function TermsPage() {
   return (

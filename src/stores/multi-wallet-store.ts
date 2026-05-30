@@ -43,6 +43,10 @@ interface MultiWalletState {
   activeAdapter: WalletAdapter | null;
   isSelectorOpen: boolean;
 
+  /* Route-specific error isolation for enterprise-grade UX */
+  loginError: string | null;
+  registerError: string | null;
+
   /* WC2-specific state */
   wc2PairingUri: string | null;
   wc2PairingState: "idle" | "pairing" | "awaiting_approval" | "approved" | "rejected" | "timeout" | "error";
@@ -75,6 +79,11 @@ interface MultiWalletState {
   updateWalletStatus: (walletId: WalletId, status: WalletEntry["status"]) => void;
   signMessage: (message: string) => Promise<string>;
   setSelectorOpen: (open: boolean) => void;
+  /* Route-specific error isolation for enterprise-grade UX */
+  setLoginError: (error: string | null) => void;
+  setRegisterError: (error: string | null) => void;
+  clearLoginError: () => void;
+  clearRegisterError: () => void;
   /* WC2 actions */
   setWc2PairingUri: (uri: string | null) => void;
   setWc2PairingState: (state: MultiWalletState["wc2PairingState"]) => void;
@@ -130,6 +139,10 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
   error: null,
   activeAdapter: null,
   isSelectorOpen: false,
+
+  /* Route-specific error isolation defaults */
+  loginError: null,
+  registerError: null,
 
   /* WC2 defaults */
   wc2PairingUri: null,
@@ -531,4 +544,9 @@ export const useMultiWalletStore = create<MultiWalletState>()((set, get) => ({
       ledgerConnectionError: null,
     });
   },
+
+  setLoginError: (loginError) => set({ loginError }),
+  setRegisterError: (registerError) => set({ registerError }),
+  clearLoginError: () => set({ loginError: null }),
+  clearRegisterError: () => set({ registerError: null }),
 }));

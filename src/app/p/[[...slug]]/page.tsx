@@ -76,12 +76,8 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
   const { title, description } = parseFrontmatter(raw);
 
   return {
-    title: title ? `${title} — Moistello` : `${slug} — Moistello`,
-    description: description || `Uploaded page: ${slug}`,
-    openGraph: {
-      title: title || slug,
-      description: description || '',
-    },
+    title: title || slug,
+    description: description || `Page: ${slug}`,
   };
 }
 

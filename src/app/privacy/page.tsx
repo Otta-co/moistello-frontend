@@ -1,6 +1,26 @@
-import { PublicLayout } from "@/components/layout/public-layout";
+import { Metadata } from "next"
+import { PublicLayout } from "@/components/layout/public-layout"
 
-export const metadata = { title: "Privacy Policy - Moistello" };
+export const metadata: Metadata = {
+  title: "Privacy Policy - Moistello",
+  description: "Moistello privacy policy. Learn what data we collect, how we use wallet addresses, on-chain activity, and your rights regarding data access and deletion.",
+  keywords: "moistello, privacy, policy, data, wallet, stellar, blockchain, MoiScore, unbanked",
+  authors: [{ name: "Nekwachukwu Ucheokoye" }],
+  creator: "Moistello",
+  publisher: "Moistello",
+  alternates: { canonical: "/privacy" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://moistello.com/privacy",
+    siteName: "Moistello",
+    title: "Privacy Policy - Moistello",
+    description: "Our privacy policy covers wallet addresses, on-chain data, user rights, and data handling on the Stellar blockchain.",
+    images: [{ url: "/logo.jpg", width: 1200, height: 630, alt: "Privacy Policy - Moistello" }],
+  },
+  twitter: { card: "summary_large_image", title: "Privacy Policy - Moistello", description: "Learn how Moistello handles wallet addresses and user data on Stellar.", images: ["/logo.jpg"] },
+}
 
 export default function PrivacyPage() {
   return (
