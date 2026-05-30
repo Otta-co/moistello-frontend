@@ -98,6 +98,7 @@ export default function RegisterPage() {
   const address = useMultiWalletStore((s) => s.address)
   const activeAdapter = useMultiWalletStore((s) => s.activeAdapter)
   const detectedWallets = useMultiWalletStore((s) => s.detectedWallets)
+  const isScanning = useMultiWalletStore((s) => s.isScanning)
   const wc2PairingState = useMultiWalletStore((s) => s.wc2PairingState)
   const wc2PairingUri = useMultiWalletStore((s) => s.wc2PairingUri)
   const wc2PairingError = useMultiWalletStore((s) => s.wc2PairingError)
@@ -216,7 +217,12 @@ export default function RegisterPage() {
     setIsWc2Active(false)
   }, [resetWc2Pairing])
 
-  const handleWc2Retry = () => {
+  const handleWc2Retry = async () => {
+    const { resetWcState, disconnectWc } = await import(
+      "@/lib/wallet/adapters/walletconnect"
+    )
+    await disconnectWc()
+    resetWcState()
     handleSelectWallet("walletconnect")
   }
 
@@ -602,13 +608,22 @@ export default function RegisterPage() {
                      </div>
                    )}
 
-                  {extensionWallets.filter((w) => w.status === "detected")
-                    .length === 0 && !hasPasskey && !hasWalletConnect && !hasLedger && (
+{extensionWallets.filter((w) => w.status === "detected")
+                    .length === 0 && !hasPasskey && !hasWalletConnect && !hasLedger && !isScanning && (
                     <p className="text-sm text-muted-foreground text-center py-2">
                       No wallets available. Install a Stellar wallet like
                       Freighter or use WalletConnect.
                     </p>
-                  )}
+                    )}
+
+                    {isScanning && (
+                    <div className="flex flex-col items-center justify-center py-6 gap-3">
+                      <Loader2 className="h-6 w-6 animate-spin text-aurora-violet" />
+                      <p className="text-sm text-muted-foreground">
+                        Detecting wallets...
+                      </p>
+                    </div>
+                    )}
 
                   <p className="text-xs text-muted-foreground text-center pt-2">
                     Your keys, your coins. We never have access to your funds.

@@ -96,6 +96,11 @@ function networkFromChainId(chainId: string): NetworkType {
   return chainId === "stellar:pubnet" ? "mainnet" : "testnet"
 }
 
+let connectedPublicKey: string | null = null
+let connectedNetwork: NetworkType = "testnet"
+let sessionTopic: string | null = null
+let wcSignClient: unknown = null
+
 export function createWalletConnectAdapter(): WalletAdapter {
   const meta: WalletMeta = {
     id: "walletconnect",
@@ -107,11 +112,6 @@ export function createWalletConnectAdapter(): WalletAdapter {
     priority: 0,
     isAvailable: () => isBrowser(),
   }
-
-  let connectedPublicKey: string | null = null
-  let connectedNetwork: NetworkType = "testnet"
-  let sessionTopic: string | null = null
-  let wcSignClient: unknown = null
 
   async function getOrInitSignClient(): Promise<unknown> {
     if (wcSignClient) return wcSignClient
@@ -289,6 +289,17 @@ export function createWalletConnectAdapter(): WalletAdapter {
           settled = true
         }
 
+        // Handle session deletion during connection attempt
+        const cleanupSession = () => {
+          ;(signClient as { on: (event: string, handler: (...args: unknown[]) => void) => void }).on("session_delete", (topic: unknown) => {
+            if (!getSettled() && topic === sessionTopic) {
+              setSettled()
+              reject(createRejectedError("walletconnect"))
+            }
+          })
+        }
+        cleanupSession()
+
         createSessionHandler(
           signClient as {
             on: (event: string, handler: (...args: unknown[]) => void) => void
@@ -331,6 +342,17 @@ export function createWalletConnectAdapter(): WalletAdapter {
                 reject(createInternalError("walletconnect", "No pairing URI generated", "WC2 connect returned no URI"))
               }
               return
+            }
+
+            // Handle proposal expiration
+            if (!getSettled()) {
+              ;(signClient as { on: (event: string, handler: (...args: unknown[]) => void) => void }).on("proposal_expire", () => {
+                if (!getSettled()) {
+                  setSettled()
+                  relay.recordOutcome(false, performance.now() - startTime)
+                  reject(createTimeoutError("walletconnect", CONNECT_TIMEOUT))
+                }
+              })
             }
 
             if (_onPairingUri) {
@@ -396,14 +418,16 @@ export function createWalletConnectAdapter(): WalletAdapter {
                   projectId: PROJECT_ID,
                   themeMode: "dark",
                 })
+                // Track modal close for analytics only — let protocol events handle rejection
                 wcModal.subscribeModal((state: { open: boolean }) => {
                   if (!state.open && !getSettled()) {
-                    setSettled()
-                    reject(createRejectedError("walletconnect"))
+                    // Modal closed before connection - user may retry
+                    // Do NOT reject here; session_proposal or proposal_expire will handle it
                   }
                 })
                 wcModal.openModal({ uri })
               } catch {
+                // Fallback to universal link if modal fails
                 window.open(`https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`, "_blank")
               }
             } else {
@@ -524,4 +548,27 @@ async function createAuthXDR(message: string): Promise<{ xdr: string; hash: stri
 
   const xdr = btoa(`MOISTELLO_AUTH:${hash}:${Date.now()}`)
   return { xdr, hash }
+}
+
+export function resetWcState(): void {
+  connectedPublicKey = null
+  connectedNetwork = "testnet"
+  sessionTopic = null
+  wcSignClient = null
+  getWC2SessionStore().clear()
+}
+
+export async function disconnectWc(): Promise<void> {
+  const sc = wcSignClient as { disconnect?: (opts: { topic: string }) => Promise<void> } | null
+  if (sc?.disconnect && sessionTopic) {
+    try {
+      await sc.disconnect({ topic: sessionTopic })
+    } catch {
+      // best-effort disconnect
+    }
+  }
+  connectedPublicKey = null
+  sessionTopic = null
+  wcSignClient = null
+  getWC2SessionStore().clear()
 }
